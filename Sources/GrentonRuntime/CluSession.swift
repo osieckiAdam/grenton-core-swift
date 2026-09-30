@@ -101,7 +101,9 @@ public actor CluSession {
         self.random = random
         self.logger = logger
         self.responseTimeout = responseTimeout
-        self.maxKeysPerRegister = maxKeysPerRegister
+        // At most 30 keys per request (spec §10 pt 4); at least one, or
+        // chunking cannot advance.
+        self.maxKeysPerRegister = min(max(maxKeysPerRegister, 1), 30)
         self.keepAliveId = random.messageId()
     }
 
@@ -343,7 +345,7 @@ public actor CluSession {
             throw SessionError.notConnected
         }
         _ = try await sendRequest(
-            Payloads.action(action), msgId: random.messageId(), over: socket)
+            try Payloads.action(action), msgId: random.messageId(), over: socket)
     }
 
     // MARK: - Reports

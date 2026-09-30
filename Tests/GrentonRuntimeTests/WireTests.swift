@@ -40,32 +40,43 @@ import GrentonModel
 
     // MARK: - Action payloads (spec §5.3.4)
 
-    @Test func formatsAllActionVariants() {
+    @Test func formatsAllActionVariants() throws {
         let variable = ActionRef(
             cluId: "c", objectName: "x_var", event: .on,
             call: .variable(index: "x_var"), value: "1")
-        #expect(Payloads.action(variable) == "setVar(\"x_var\",\"1\")")
+        #expect(try Payloads.action(variable) == "setVar(\"x_var\",\"1\")")
 
         let attribute = ActionRef(
             cluId: "c", objectName: "DOU8272", event: .on,
             call: .attribute(index: "0"), value: "1")
-        #expect(Payloads.action(attribute) == "DOU8272:set(0,\"1\")")
+        #expect(try Payloads.action(attribute) == "DOU8272:set(0,\"1\")")
 
         let method = ActionRef(
             cluId: "c", objectName: "DIM3333", event: .click,
             call: .method(index: "0"), value: "50.0")
-        #expect(Payloads.action(method) == "DIM3333:execute(0,\"50.0\")")
+        #expect(try Payloads.action(method) == "DIM3333:execute(0,\"50.0\")")
 
         let script = ActionRef(
             cluId: "c", objectName: "scena_wieczor", event: .click,
             call: .script, value: "\"123\"")
-        #expect(Payloads.action(script) == "scena_wieczor(\"123\")")
+        #expect(try Payloads.action(script) == "scena_wieczor(\"123\")")
 
         let scriptNoArgs = script.withValue("")
-        #expect(Payloads.action(scriptNoArgs) == "scena_wieczor()")
+        #expect(try Payloads.action(scriptNoArgs) == "scena_wieczor()")
     }
 
     // MARK: - Response parsing (spec §5.2)
+
+    @Test func unresolvedPlaceholderIsNotSent() {
+        let setPoint = ActionRef(
+            cluId: "c", objectName: "THE1001", event: .click,
+            call: .attribute(index: "3"), value: ActionRef.valuePlaceholder)
+        #expect(throws: PayloadError.unresolvedPlaceholder) { try Payloads.action(setPoint) }
+        // Overridden with a real value, it is an ordinary action.
+        #expect((try? Payloads.action(setPoint.withValue("21.0"))) == "THE1001:set(3,\"21.0\")")
+        // Only the exact placeholder is special.
+        #expect((try? Payloads.action(setPoint.withValue("x$value$"))) != nil)
+    }
 
     @Test func parsesResponseAndLowercasesMsgId() throws {
         let response = try #require(WireFrame.parseResponse(

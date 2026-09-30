@@ -9,6 +9,12 @@ import Testing
         for skip in suite.port.skips {
             #expect(!skip.reason.isEmpty, "skip \(skip.id) needs a reason")
         }
+        // Profiles this port does not claim are reported, not passed.
+        let unclaimed = suite.unclaimedCaseIds
+        if !unclaimed.isEmpty {
+            print("conformance: \(unclaimed.count) case(s) outside the declared profiles \(suite.port.profiles) are not run")
+        }
+        #expect(!ConformanceSuite.caseIds.isEmpty, "the declared profiles contain no cases")
     }
 
     @Test(arguments: ConformanceSuite.caseIds)

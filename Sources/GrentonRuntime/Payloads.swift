@@ -18,6 +18,9 @@ public enum PayloadError: Error, Sendable, Equatable {
     /// A registration request must carry at least one key (reference
     /// behaviour; the session never sends an empty registration).
     case emptyRegistration
+    /// The action's value is still Object Manager's `$value$` placeholder:
+    /// sending it would hand the CLU the literal text (spec §3.3).
+    case unresolvedPlaceholder
 }
 
 public enum Payloads {
@@ -35,7 +38,8 @@ public enum Payloads {
 
     /// Action payloads (spec §5.3.4). Values are interpolated verbatim —
     /// the injection caveat of spec §5.3.4 applies to caller-supplied input.
-    public static func action(_ action: ActionRef) -> String {
+    public static func action(_ action: ActionRef) throws -> String {
+        guard action.value != ActionRef.valuePlaceholder else { throw PayloadError.unresolvedPlaceholder }
         switch action.call {
         case .variable(let index):
             return "setVar(\"\(index)\",\"\(action.value)\")"

@@ -14,6 +14,7 @@ port, the docs and the examples, and the gates.
 - `swift test`: unit tests plus the conformance suite.
 - `scripts/docs.sh`: build the documentation site and serve it at http://localhost:8000/. It covers the landing page and Getting Started from `site/`, plus the DocC reference under `api/`.
 - Git hooks live in `scripts/hooks`. Enable them once per clone: `git config core.hooksPath scripts/hooks`.
+- The installation-data gate compares against your interface archive: `$GRENTON_INTERFACE`, `git config grenton.interface <path>`, or `dist/interface.zip`. Without one it fails. On a clone with no installation, declare it once: `git config grenton.interface none`.
 
 ## Layout
 
@@ -32,5 +33,5 @@ port, the docs and the examples, and the gates.
 
 - The spec is normative text, not a log (see the skill).
 - No identifiers of the user's real installation in files or commit messages.
-- Live runs happen in Terminal.app, not VS Code, because of Local Network privacy. Writes that change the house need the user's go-ahead.
+- Live runs need Local Network access for the app they run in. On this Mac, Terminal.app has it. VS Code, including its built-in terminal and Claude's session, does not unless it is granted in System Settings → Privacy & Security → Local Network. Writes that change the house need the user's go-ahead.
 - GrentonModel and GrentonRuntime are not docs-gated yet. Much of their public API is plumbing between modules and should become `package` access.

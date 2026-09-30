@@ -16,14 +16,16 @@ import GrentonTestSupport
         fake: FakeClu,
         cipher: AesCbcCipher,
         timeout: Duration = .seconds(2),
-        failOpens: Bool = false
+        failOpens: Bool = false,
+        maxKeysPerRegister: Int = 30
     ) -> CluSession {
         CluSession(
             clu: Clu(id: "CLU_1", serialNumber: "1", name: "Test", ip: "10.0.0.1",
                      port: 1234, connectionType: .localOnly),
             cipher: cipher,
             socketFactory: InMemoryUdpSocketFactory(fake: fake, failOpens: failOpens),
-            responseTimeout: timeout)
+            responseTimeout: timeout,
+            maxKeysPerRegister: maxKeysPerRegister)
     }
 
     func makeFixture(timeout: Duration = .seconds(2)) throws -> (FakeClu, CluSession) {
@@ -112,14 +114,50 @@ import GrentonTestSupport
 
         let slots = await session.register(attributeKeys(35))
         #expect(slots.count == 35)
-        // Chunks run concurrently but results must land positionally:
-        // first 30 slots from one registration, last 5 from the other.
+        // Chunks are registered one after another (spec §5.4.2), so the
+        // 30-key chunk is registration 0 and the 5-key chunk registration 1,
+        // and results land positionally.
         let numbers: [Int64] = slots.compactMap {
             if case .value(.int(let n)) = $0 { return n } else { return nil }
         }
         #expect(numbers.count == 35)
-        #expect(numbers[0] % 1000 == 0 && numbers[29] % 1000 == 29)
-        #expect(numbers[30] % 1000 == 0 && numbers[34] % 1000 == 4)
+        #expect(numbers[0] == 0 && numbers[29] == 29)
+        #expect(numbers[30] == 1000 && numbers[34] == 1004)
+        await session.stop()
+    }
+
+    @Test func nextChunkWaitsForThePreviousOne() async throws {
+        let (fake, session) = try makeFixture(timeout: .milliseconds(400))
+        // The first chunk never answers; the second must not be sent until
+        // the first has timed out.
+        await fake.setSilenced {
+            $0.hasPrefix("SYSTEM:clientRegister(")
+                && FakeClu.parseRegistration($0).keyCount == 30
+        }
+        await session.start()
+        let registering = Task { await session.register(attributeKeys(35)) }
+        try await Task.sleep(for: .milliseconds(150))
+        let sentSoFar = await fake.receivedPayloads.filter { $0.hasPrefix("SYSTEM:clientRegister(") }
+        #expect(sentSoFar.count == 1)
+        _ = await registering.value
+        let sentInTotal = await fake.receivedPayloads.filter { $0.hasPrefix("SYSTEM:clientRegister(") }
+        #expect(sentInTotal.count == 2)
+        await session.stop()
+    }
+
+    @Test(arguments: [(0, 1), (31, 30), (-5, 1), (10, 10)])
+    func chunkSizeIsClampedToTheProtocolLimit(requested: Int, effective: Int) async throws {
+        let cipher = try AesCbcCipher(keyBase64: Self.keyB64, ivBase64: Self.ivB64)
+        let fake = FakeClu(cipher: cipher)
+        let session = makeSession(fake: fake, cipher: cipher, maxKeysPerRegister: requested)
+        await session.start()
+        _ = await session.register(attributeKeys(35))
+        let sizes = await fake.receivedPayloads
+            .filter { $0.hasPrefix("SYSTEM:clientRegister(") }
+            .map { FakeClu.parseRegistration($0).keyCount }
+        #expect(sizes.allSatisfy { $0 <= effective })
+        #expect(sizes.reduce(0, +) == 35)
+        #expect(sizes.first == effective)
         await session.stop()
     }
 
@@ -238,6 +276,18 @@ import GrentonTestSupport
         try await session.execute(action)
         let payloads = await fake.receivedPayloads
         #expect(payloads.contains("DOU8272:set(0,\"1\")"))
+        await session.stop()
+    }
+
+    @Test func unresolvedPlaceholderActionIsNotSent() async throws {
+        let (fake, session) = try makeFixture()
+        await session.start()
+        let setPoint = ActionRef(
+            cluId: "CLU_1", objectName: "THE1001", event: .click,
+            call: .attribute(index: "3"), value: ActionRef.valuePlaceholder)
+        await #expect(throws: PayloadError.unresolvedPlaceholder) { try await session.execute(setPoint) }
+        let payloads = await fake.receivedPayloads
+        #expect(!payloads.contains { $0.contains("$value$") })
         await session.stop()
     }
 

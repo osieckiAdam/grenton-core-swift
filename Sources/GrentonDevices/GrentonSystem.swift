@@ -152,10 +152,11 @@ public actor GrentonSystem: CommandExecuting {
 
     /// Connects to every CLU and subscribes to all values.
     ///
-    /// Returns once each CLU has answered its first subscription, so every
-    /// value a CLU could report is already known. A CLU that does not answer
-    /// does not stop the others; check ``sessionStates()``. Calling `start()`
-    /// again while running does nothing.
+    /// Returns once every CLU's first subscription has either been answered or
+    /// timed out. The values of the CLUs that answered are then known; a CLU
+    /// that did not answer leaves its values `nil` and is retried in the
+    /// background. Check ``sessionStates()`` to see which answered. Calling
+    /// `start()` again while running does nothing.
     public func start() async {
         await beginOperation()
         defer { endOperation() }
@@ -247,6 +248,9 @@ public actor GrentonSystem: CommandExecuting {
 
     /// Sends a raw action to its CLU. Entities call this for you; use it only
     /// for actions that no entity covers.
+    ///
+    /// - Throws: `PayloadError.unresolvedPlaceholder` when the action's value
+    ///   is still `$value$`; give it a value with `withValue(_:)` first.
     public func execute(_ action: ActionRef) async throws {
         guard let session = sessions[action.cluId] else {
             logger.warning("No session for CLU \(action.cluId)")

@@ -13,6 +13,7 @@ struct SuiteError: Error, CustomStringConvertible, Sendable {
 
 struct ConformanceCase: Sendable {
     let id: String
+    let profile: String
     let operation: String
     let input: JSON
     let expect: JSON
@@ -57,8 +58,17 @@ struct ConformanceSuite: Sendable {
 
     /// Case ids for the parameterized test; empty when the suite is broken
     /// (the integrity test then fails with the reason).
+    /// Ids of the cases in the profiles this port declares; empty when the
+    /// suite is broken (the integrity test then fails with the reason).
     static var caseIds: [String] {
-        (try? shared.get()).map { $0.cases.keys.sorted() } ?? []
+        (try? shared.get()).map { suite in
+            suite.cases.values.filter { suite.port.profiles.contains($0.profile) }.map(\.id).sorted()
+        } ?? []
+    }
+
+    /// Cases of profiles this port does not declare — reported, never passed.
+    var unclaimedCaseIds: [String] {
+        cases.values.filter { !port.profiles.contains($0.profile) }.map(\.id).sorted()
     }
 
     static func load() throws -> ConformanceSuite {
@@ -78,6 +88,18 @@ struct ConformanceSuite: Sendable {
             throw SuiteError("manifest.json lacks suiteVersion or cases")
         }
 
+        // operation → profile, from the manifest (conformance.md §1, §4).
+        guard case .object(let profiles)? = manifest["profiles"] else {
+            throw SuiteError("manifest.json lacks profiles")
+        }
+        var profileOf: [String: String] = [:]
+        for (profile, operations) in profiles {
+            for operation in operations.arrayValue ?? [] {
+                guard let name = operation.stringValue else { throw SuiteError("malformed profile \(profile)") }
+                profileOf[name] = profile
+            }
+        }
+
         var cases: [String: ConformanceCase] = [:]
         var listedPaths: Set<String> = []
         for entry in entries {
@@ -90,16 +112,16 @@ struct ConformanceSuite: Sendable {
             guard sha256(data) == hash else { throw SuiteError("\(path): SHA-256 does not match the manifest") }
 
             let doc = try JSON.decode(data)
-            guard doc["schemaVersion"]?.intValue == supportedSchemaVersion else {
-                throw SuiteError("\(path): unsupported schemaVersion")
-            }
-            guard doc["id"]?.stringValue == id,
-                  let operation = doc["operation"]?.stringValue,
+            try validateCaseShape(doc, path: path)
+            guard doc["id"]?.stringValue == id, let operation = doc["operation"]?.stringValue,
                   let input = doc["input"], let expect = doc["expect"] else {
-                throw SuiteError("\(path): malformed case")
+                throw SuiteError("\(path): id does not match the manifest")
+            }
+            guard let profile = profileOf[operation] else {
+                throw SuiteError("\(path): operation \(operation) belongs to no manifest profile")
             }
             guard cases[id] == nil else { throw SuiteError("duplicate case id \(id)") }
-            cases[id] = ConformanceCase(id: id, operation: operation, input: input, expect: expect)
+            cases[id] = ConformanceCase(id: id, profile: profile, operation: operation, input: input, expect: expect)
             listedPaths.insert(path)
         }
 
@@ -125,11 +147,45 @@ struct ConformanceSuite: Sendable {
         for skip in port.skips where cases[skip.id] == nil {
             throw SuiteError("port.json skips unknown case \(skip.id)")
         }
+        for profile in port.profiles where profiles[profile] == nil {
+            throw SuiteError("port.json declares profile \(profile), which the suite does not define")
+        }
+        for skip in port.skips where !port.profiles.contains(cases[skip.id]!.profile) {
+            throw SuiteError("port.json skips \(skip.id), which is outside the declared profiles")
+        }
         return ConformanceSuite(suiteVersion: suiteVersion, cases: cases, port: port)
     }
 }
 
 extension ConformanceSuite {
+    /// The case shape of conformance.md §2: exactly these fields, a known
+    /// schema version, non-empty specRefs, and one of the three outcomes.
+    static func validateCaseShape(_ doc: JSON, path: String) throws {
+        func fail(_ why: String) -> SuiteError { SuiteError("\(path): \(why)") }
+        guard case .object(let fields) = doc else { throw fail("not a JSON object") }
+        let expected: Set = ["schemaVersion", "id", "specRefs", "description", "provenance",
+                             "operation", "input", "expect"]
+        guard Set(fields.keys) == expected else {
+            throw fail("fields must be exactly \(expected.sorted()), got \(fields.keys.sorted())")
+        }
+        guard doc["schemaVersion"]?.intValue == supportedSchemaVersion else { throw fail("unsupported schemaVersion") }
+        for key in ["id", "description", "provenance", "operation"] where doc[key]?.stringValue == nil {
+            throw fail("\(key) must be a string")
+        }
+        guard let refs = doc["specRefs"]?.arrayValue, !refs.isEmpty,
+              refs.allSatisfy({ $0.stringValue?.isEmpty == false }) else {
+            throw fail("specRefs must be a non-empty list of strings")
+        }
+        guard case .object? = doc["input"] else { throw fail("input must be an object") }
+        guard case .object(let expect)? = doc["expect"] else { throw fail("expect must be an object") }
+        switch expect["outcome"]?.stringValue {
+        case "ok" where Set(expect.keys) == ["outcome", "value"]: break
+        case "error" where Set(expect.keys) == ["outcome", "code"] && expect["code"]?.stringValue != nil: break
+        case "reject" where Set(expect.keys) == ["outcome"]: break
+        default: throw fail("expect must be {outcome: ok, value} | {outcome: error, code} | {outcome: reject}")
+        }
+    }
+
     static func sha256(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }

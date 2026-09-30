@@ -81,6 +81,10 @@ public struct ActionRef: Hashable, Sendable {
         self.init(cluId: dto.cluId, objectName: dto.objectName, event: dto.event, call: call, value: dto.value)
     }
 
+    /// The value Object Manager exports for set actions whose value is chosen
+    /// at run time (spec §3.3). It must be replaced before sending.
+    public static let valuePlaceholder = "$value$"
+
     /// Copy with a different payload value; the template stays untouched.
     public func withValue(_ newValue: String) -> ActionRef {
         ActionRef(cluId: cluId, objectName: objectName, event: event, call: call, value: newValue)

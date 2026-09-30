@@ -60,7 +60,7 @@ enum Operations {
             // a parse failure (§3.6) is the case's `reject`.
             guard let dto = try? JSONDecoder().decode(ActionRefDTO.self, from: actionJSON.data()),
                   let action = try? ActionRef(dto: dto) else { return reject }
-            return ok(["payload": .string(Payloads.action(action))])
+            return ok(["payload": .string(try Payloads.action(action))])
         },
         "payload.report": { input in
             guard let report = Payloads.parseClientReport(try input.string("payload")) else { return reject }
@@ -123,6 +123,8 @@ enum Operations {
         case ProvisioningError.connection: return "provisioning.connection"
         case ProvisioningError.authenticationFailed: return "provisioning.authenticationFailed"
         case ProvisioningError.invalidData: return "provisioning.invalidData"
+        case PayloadError.unresolvedPlaceholder: return "payload.unresolvedPlaceholder"
+        case PayloadError.emptyRegistration: return "payload.emptyRegistration"
         default: return "unmapped: \(error)"
         }
     }

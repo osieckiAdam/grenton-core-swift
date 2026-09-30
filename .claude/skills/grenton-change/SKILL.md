@@ -78,8 +78,9 @@ When unsure whether the spec describes it, grep `vendor/grenton-core-spec/spec/g
 `Examples/<name>/main.swift` are small, readable programs that use the
 public API; README's Quick start and Examples table point to them. Try new
 behaviour against a live installation by writing an example, not a new CLI
-flag. The user runs live examples in **Terminal.app**: VS Code, including
-its terminal, has no Local Network access. Ask before any example that
+flag. The user runs live examples in **Terminal.app**, which has Local Network
+access. VS Code, including its terminal, does not unless it is granted in
+System Settings. Ask before any example that
 changes the house (switching, heating).
 
 ## 6. Gate
@@ -100,6 +101,8 @@ them (`--no-verify`); fix the cause.
 
 - **No identifiers of the user's installation** in files or commit
   messages: object names, widget ids, labels, page/CLU names, counts. Use
-  synthetic ones (`THE1001`, "Taśma A"). The hooks check this against
-  `dist/interface.zip`.
+  synthetic ones (`THE1001`, "Taśma A"). The hooks check this against the
+  interface archive: `dist/interface.zip`, or `git config grenton.interface`.
+  Without an archive they fail. A clone with no installation sets
+  `grenton.interface none`.
 - Commit order: spec first, then the port.
