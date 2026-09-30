@@ -75,6 +75,10 @@ final class SessionScenario: @unchecked Sendable {
         reportLock.withLock { reports.isEmpty ? nil : reports.removeFirst() }
     }
 
+    /// Real time a negative assertion keeps watching after the barrier
+    /// (conformance.md §4b, at least 200 ms).
+    static let quietWindow: Duration = .milliseconds(250)
+
     /// Lets the session finish whatever it can do without time passing or
     /// new datagrams (the barrier of conformance.md §4b).
     private func settle() async {
@@ -106,29 +110,30 @@ final class SessionScenario: @unchecked Sendable {
             let rest = frame.dropFirst("req::".count)
             guard let colon = rest.firstIndex(of: ":") else { throw SuiteError("sent frame \(frame) has no msg_id") }
             let msgId = String(rest[..<colon]), payload = String(rest[rest.index(after: colon)...])
-            try bind(socket: body["socket"]?.stringValue ?? "", to: socket)
-            try match(msgId: body["msgId"]?.stringValue ?? "", observed: msgId)
-            let expectedPayload = body["payload"]?.stringValue ?? ""
+            try bind(socket: body.field("socket"), to: socket)
+            try match(msgId: body.field("msgId"), observed: msgId)
+            let expectedPayload = try body.field("payload")
             guard payload == expectedPayload else {
                 throw SuiteError("sent payload \(payload), expected \(expectedPayload)")
             }
         } else if step["expectQuiet"] != nil {
             await settle()
-            if let extra = await transport.nextSent(wait: .zero) {
+            if let extra = await transport.nextSent(wait: Self.quietWindow) {
                 let text = cipher.decrypt(extra.datagram).flatMap { String(data: $0, encoding: .utf8) }
                 throw SuiteError("expected nothing sent, but the session sent \(text ?? "an undecryptable datagram")")
             }
         } else if let body = step["respond"] {
-            let socket = try labeled(body["socket"]?.stringValue ?? "")
-            var msgId = try resolve(msgId: body["msgId"]?.stringValue ?? "")
+            let socket = try labeled(body.field("socket"))
+            var msgId = try resolve(msgId: body.field("msgId"))
             if body["upper"]?.boolValue == true { msgId = msgId.uppercased() }
-            let frame = "resp:\(cluIp):\(msgId):\(body["payload"]?.stringValue ?? "")"
+            let frame = "resp:\(cluIp):\(msgId):\(try body.field("payload"))"
             socket.deliver(try cipher.encrypt(Data(frame.utf8)))
             await settle()
         } else if let body = step["deliver"] {
-            let socket = try labeled(body["socket"]?.stringValue ?? "")
-            let frame = Data((body["frame"]?.stringValue ?? "").utf8)
-            socket.deliver(body["encrypted"]?.boolValue == true ? try cipher.encrypt(frame) : frame)
+            let socket = try labeled(body.field("socket"))
+            let frame = Data(try body.field("frame").utf8)
+            guard let encrypted = body["encrypted"]?.boolValue else { throw SuiteError("deliver needs encrypted") }
+            socket.deliver(encrypted ? try cipher.encrypt(frame) : frame)
             await settle()
         } else if let milliseconds = step["advance"]?.intValue {
             await settle()
@@ -148,12 +153,15 @@ final class SessionScenario: @unchecked Sendable {
             }
         } else if step["expectNoReport"] != nil {
             await settle()
-            if let report = await takeReport(wait: .zero) {
+            if let report = await takeReport(wait: Self.quietWindow) {
                 throw SuiteError("unexpected report for \(report.keys.count) key(s)")
             }
         } else if let label = step["expectClosed"]?.stringValue {
             await settle()
             guard try labeled(label).isClosed else { throw SuiteError("socket \(label) is still open") }
+        } else if let label = step["fail"]?.stringValue {
+            try labeled(label).fail()
+            await settle()
         } else {
             throw SuiteError("unknown step \(step)")
         }
@@ -170,7 +178,8 @@ final class SessionScenario: @unchecked Sendable {
         case "ping":
             calls[name] = Task { .object(["ok": .bool(await session.ping())]) }
         case "register":
-            let keys = try (step["keys"]?.arrayValue ?? []).map(Self.valueRef)
+            guard let keyList = step["keys"]?.arrayValue else { throw SuiteError("register needs keys") }
+            let keys = try keyList.map(Self.valueRef)
             calls[name] = Task { .object(["slots": .array(await session.register(keys).map(Self.slot))]) }
         case "execute":
             guard let actionJSON = step["action"] else { throw SuiteError("execute needs an action") }
@@ -237,10 +246,9 @@ final class SessionScenario: @unchecked Sendable {
     static func valueRef(_ key: JSON) throws -> ValueRef {
         switch key["type"]?.stringValue {
         case "variable":
-            return .variable(cluId: "CLU", name: key["name"]?.stringValue ?? "")
+            return .variable(cluId: "CLU", name: try key.field("name"))
         case "attribute":
-            return .attribute(cluId: "CLU", objectName: key["objectName"]?.stringValue ?? "",
-                              index: key["index"]?.stringValue ?? "")
+            return .attribute(cluId: "CLU", objectName: try key.field("objectName"), index: try key.field("index"))
         default:
             throw SuiteError("bad key \(key)")
         }
@@ -270,5 +278,13 @@ final class SessionScenario: @unchecked Sendable {
         case PayloadError.unresolvedPlaceholder: return "payload.unresolvedPlaceholder"
         default: return "unmapped: \(error)"
         }
+    }
+}
+
+private extension JSON {
+    /// A required string field of a step; a missing one is a runner failure.
+    func field(_ key: String) throws -> String {
+        guard let value = self[key]?.stringValue else { throw SuiteError("step field `\(key)` missing in \(self)") }
+        return value
     }
 }

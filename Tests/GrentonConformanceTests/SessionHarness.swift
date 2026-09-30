@@ -105,6 +105,12 @@ final class ScriptedSocket: UdpSocket, @unchecked Sendable {
         continuation.yield(datagram)
     }
 
+    /// The transport fails: the session's receive loop ends, but the socket
+    /// was not closed by the session (conformance.md §4b `fail`).
+    func fail() {
+        continuation.finish()
+    }
+
     func close() {
         lock.lock()
         closed = true
