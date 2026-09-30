@@ -1,10 +1,10 @@
-/// Component DTOs (spec §3.5). List components carry `label`/`rowId`/`unit`;
-/// the double-widget components are standalone shapes without `rowId`.
-///
-/// Components with a fixed `type` literal follow the reference semantics
-/// (pydantic `Literal` with default): the field may be absent, but when
-/// present it must match — a mismatch rejects the component and thereby its
-/// widget.
+// Component DTOs (spec §3.5). List components carry `label`/`rowId`/`unit`;
+// the double-widget components are standalone shapes without `rowId`.
+//
+// Components with a fixed `type` literal follow the reference semantics
+// (pydantic `Literal` with default): the field may be absent, but when
+// present it must match — a mismatch rejects the component and thereby its
+// widget.
 
 func validateTypeLiteral(
     _ container: KeyedDecodingContainer<TypeLiteralKey>,

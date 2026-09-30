@@ -18,6 +18,7 @@ public extension UdpSocket {
     var localPort: Int? { nil }
 }
 
+/// Opens the UDP connections to the CLUs. Supply your own only to change the transport.
 public protocol UdpSocketFactory: Sendable {
     func open(host: String, port: Int) async throws -> any UdpSocket
 }
@@ -31,10 +32,13 @@ func validatePort(_ port: Int) throws -> NWEndpoint.Port {
 
 // MARK: - Connected-UDP mode (default)
 
-/// Default production factory: one connected `NWConnection` per socket.
-/// Connected UDP binds an ephemeral local port per connection and filters
-/// the sender to the peer (spec Δ §7.1). For multi-homed CLUs that report
-/// from a different source address, use `NetworkUdpListenerSocketFactory`.
+// Default production factory: one connected `NWConnection` per socket.
+// Connected UDP binds an ephemeral local port per connection and filters
+// the sender to the peer (spec Δ §7.1). For multi-homed CLUs that report
+// from a different source address, use `AnySourceUdpSocketFactory`.
+/// The default transport: one connected UDP socket per connection, which only accepts datagrams from its CLU.
+///
+/// If a CLU answers from a different address than the one in the interface, use ``AnySourceUdpSocketFactory``.
 public struct NetworkUdpSocketFactory: UdpSocketFactory {
     /// Upper bound on connection setup. A connection that never leaves
     /// `.preparing` would otherwise suspend the open forever; failing fast
@@ -191,16 +195,17 @@ public final class NetworkUdpSocket: UdpSocket, @unchecked Sendable {
 
 // MARK: - Any-source mode (fallback, spec §7.1)
 
-/// Fallback transport for CLUs that answer or report from a different
-/// source address/port than the one registrations are sent to.
-///
-/// Implementation note: a single UNCONNECTED BSD socket, not
-/// `NWListener` + connected `NWConnection` on a shared port — with
-/// SO_REUSEPORT the kernel distributes foreign-source datagrams between
-/// the two sockets nondeterministically, silently dropping the ones hashed
-/// to the connected socket. One unconnected socket receives every datagram
-/// addressed to its port and sends from that same port (the protocol
-/// requirement: reports return to the registration's source port).
+// Fallback transport for CLUs that answer or report from a different
+// source address/port than the one registrations are sent to.
+//
+// Implementation note: a single UNCONNECTED BSD socket, not
+// `NWListener` + connected `NWConnection` on a shared port — with
+// SO_REUSEPORT the kernel distributes foreign-source datagrams between
+// the two sockets nondeterministically, silently dropping the ones hashed
+// to the connected socket. One unconnected socket receives every datagram
+// addressed to its port and sends from that same port (the protocol
+// requirement: reports return to the registration's source port).
+/// A transport that accepts a CLU's answers from any address, for CLUs with more than one network address.
 public struct AnySourceUdpSocketFactory: UdpSocketFactory {
     public init() {}
 

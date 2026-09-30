@@ -1,5 +1,5 @@
-/// Leaf DTOs of the mobile-interface JSON (spec §3.4). Field names match the
-/// JSON 1:1 — no key-decoding strategy is applied anywhere in the model.
+// Leaf DTOs of the mobile-interface JSON (spec §3.4). Field names match the
+// JSON 1:1 — no key-decoding strategy is applied anywhere in the model.
 
 public struct EncryptionDTO: Decodable, Hashable, Sendable {
     /// Base64-encoded AES key (16/24/32 bytes after decoding).

@@ -1,4 +1,4 @@
-/// Domain-level references built from validated DTOs (spec §3.2–§3.3).
+// Domain-level references built from validated DTOs (spec §3.2–§3.3).
 
 public enum GrentonModelError: Error, Sendable, Equatable {
     case unknownDiscriminator(String)

@@ -1,7 +1,7 @@
-/// Widget DTOs and their discriminated union (spec §3.5). The union decodes
-/// the `type` discriminator and delegates to the concrete shape; an unknown
-/// discriminator throws, which at page level means the widget is skipped
-/// (spec §3.6).
+// Widget DTOs and their discriminated union (spec §3.5). The union decodes
+// the `type` discriminator and delegates to the concrete shape; an unknown
+// discriminator throws, which at page level means the widget is skipped
+// (spec §3.6).
 
 public struct ValueV2WidgetDTO: Decodable, Sendable {
     public let id: String
@@ -123,6 +123,7 @@ public struct ThermostatV2WidgetDTO: Decodable, Sendable {
 
 // MARK: - Union
 
+/// One widget of the interface, by type.
 public enum WidgetDTO: Decodable, Sendable {
     case valueV2(ValueV2WidgetDTO)
     case valueDouble(ValueDoubleWidgetDTO)

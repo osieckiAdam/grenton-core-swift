@@ -1,6 +1,6 @@
 import GrentonModel
 
-/// Frame formats of the CLU protocol (spec §5.2). Pure string work — no I/O.
+// Frame formats of the CLU protocol (spec §5.2). Pure string work — no I/O.
 
 /// A parsed `resp:` frame. Notifications share the format and are marked by
 /// the all-zero message id (spec §5.2).

@@ -1,21 +1,25 @@
 import Foundation
 import GrentonModel
 
-/// A single state change, emitted only when the stored value actually
-/// changed (spec §5.5 Δ).
+// A single state change, emitted only when the stored value actually
+// changed (spec §5.5 Δ).
+/// One value that changed on a CLU.
 public struct StateChange: Sendable, Equatable {
     public let key: ValueRef
     public let oldValue: GrentonValue?
     public let newValue: GrentonValue
 }
 
-/// Per-installation state store (spec §5.5).
+// Per-installation state store (spec §5.5).
+//
+// A lock-based class rather than an actor so device entities can read
+// state synchronously (Swift plan §4.5): spec §5.6 only requires safe
+// concurrent reads with serialized writes, which a short critical section
+// satisfies. Writes arrive from sessions; per-CLU event ordering holds as
+// long as one session updates one CLU's keys (which the design guarantees).
+/// Every value reported by the CLUs.
 ///
-/// A lock-based class rather than an actor so device entities can read
-/// state synchronously (Swift plan §4.5): spec §5.6 only requires safe
-/// concurrent reads with serialized writes, which a short critical section
-/// satisfies. Writes arrive from sessions; per-CLU event ordering holds as
-/// long as one session updates one CLU's keys (which the design guarantees).
+/// Entities read their state from here, already normalized; read the store directly only for raw values.
 public final class StateStore: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [ValueRef: GrentonValue] = [:]
@@ -47,7 +51,8 @@ public final class StateStore: @unchecked Sendable {
         return order.filter { !$0.value.isEmpty }.map(\.key)
     }
 
-    /// `nil` = value not yet known; `.null` = the CLU reported `nil`.
+    // `nil` = value not yet known; `.null` = the CLU reported `nil`.
+    /// The raw value; `nil` until the CLU has reported it. A CLU reporting nothing gives `GrentonValue.null`.
     public func value(for ref: ValueRef) -> GrentonValue? {
         lock.lock()
         defer { lock.unlock() }
@@ -78,9 +83,10 @@ public final class StateStore: @unchecked Sendable {
         }
     }
 
-    /// A NEW stream per call — every subscriber observes independently
-    /// (spec §5.5 Δ). Slow subscribers drop oldest events; the current
-    /// state is always available synchronously via `value(for:)`.
+    // A NEW stream per call — every subscriber observes independently
+    // (spec §5.5 Δ). Slow subscribers drop oldest events; the current
+    // state is always available synchronously via `value(for:)`.
+    /// A stream of every value change. It drops the oldest changes when you fall behind; the current value is always readable with ``value(for:)``.
     public func changes() -> AsyncStream<StateChange> {
         AsyncStream(bufferingPolicy: .bufferingNewest(64)) { continuation in
             let id = UUID()

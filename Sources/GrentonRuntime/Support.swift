@@ -1,14 +1,20 @@
 import Foundation
 import GrentonModel
 
-/// Session lifecycle state (spec §5.4.5).
+// Session lifecycle state (spec §5.4.5).
+/// The connection state of one CLU.
 public enum SessionState: Sendable, Equatable {
+    /// Created, not started.
     case idle
+    /// Connecting and subscribing.
     case starting
+    /// Connected and answering.
     case ready
-    /// Loops keep running but the CLU is not answering; a successful ping
-    /// returns the session to `ready`.
+    // Loops keep running but the CLU is not answering; a successful ping
+    // returns the session to `ready`.
+    /// Not answering. The library keeps trying and returns to ``ready`` when the CLU answers again.
     case degraded
+    /// Stopped by the app.
     case stopped
 }
 
@@ -71,8 +77,18 @@ extension RandomSource {
     }
 }
 
-/// Logging facade (spec §7.6) — the library never logs directly.
+// Logging facade (spec §7.6) — the library never logs directly.
+/// Where the library reports what happens, such as a CLU that does not answer.
+///
+/// Pass one to `GrentonSystem`:
+///
+/// ```swift
+/// let logger = GrentonLogger { level, message in
+///     if level >= .warning { print(message) }
+/// }
+/// ```
 public struct GrentonLogger: Sendable {
+    /// How important a message is.
     public enum Level: Int, Sendable, Comparable {
         case debug = 0, info, warning, error
         public static func < (lhs: Level, rhs: Level) -> Bool { lhs.rawValue < rhs.rawValue }
@@ -80,13 +96,16 @@ public struct GrentonLogger: Sendable {
 
     private let handler: @Sendable (Level, String) -> Void
 
+    /// Creates a logger that hands every message to `handler`.
     public init(handler: @escaping @Sendable (Level, String) -> Void) {
         self.handler = handler
     }
 
+    /// Discards every message. The default.
     public static let disabled = GrentonLogger { _, _ in }
 
-    /// Prints to stdout — for CLI tools and debugging, not production apps.
+    // Prints to stdout — for CLI tools and debugging, not production apps.
+    /// Prints every message, including debug detail. Meant for tools and debugging.
     public static let standardOutput = GrentonLogger { level, message in
         print("[grenton][\(level)] \(message)")
     }

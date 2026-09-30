@@ -29,15 +29,32 @@ final class ExecutorProxy: CommandExecuting, @unchecked Sendable {
     }
 }
 
-/// The runtime facade (spec §5.4.4, Swift plan §4.6): one CLU session per
-/// interface CLU, the 5 s ping and 45 s re-registration loops, report
-/// routing into the shared StateStore, and command routing by CLU id.
+// Runtime facade (spec §5.4.4): one CLU session per interface CLU, the 5 s
+// ping and 45 s re-registration loops, report routing into the shared
+// StateStore, and command routing by CLU id. It consumes a parsed
+// interface and does not care where it came from (Provisioning, file, QR).
+
+/// A connected Grenton installation: every device of the interface, kept
+/// up to date by the CLUs.
 ///
-/// Consumes a parsed `MobileInterfaceDTO` — it neither knows nor cares
-/// where the interface came from (Provisioning, file, QR).
+/// Create it from the mobile interface, call ``start()``, then read and
+/// control ``entities``:
+///
+/// ```swift
+/// let system = try GrentonSystem(interface: interface)
+/// await system.start()
+/// let lights = system.entities.compactMap(\.switchable)
+/// ```
+///
+/// Devices and entities exist as soon as the system is created, before any
+/// connection; their state stays `nil` until the CLUs report it.
 public actor GrentonSystem: CommandExecuting {
+    /// Every value reported by the CLUs. Entities read their state from it;
+    /// use it directly only for raw values.
     public nonisolated let store: StateStore
+    /// The devices as plain descriptions, without state or commands.
     public nonisolated let descriptors: [DeviceDescriptor]
+    /// Every device of the interface, one per widget, in page order.
     public nonisolated let devices: [BoundDevice]
 
     private let clus: [Clu]
@@ -58,6 +75,20 @@ public actor GrentonSystem: CommandExecuting {
     private var operationInProgress = false
     private var operationWaiters: [CheckedContinuation<Void, Never>] = []
 
+    /// Creates the devices of an interface. Nothing connects until ``start()``.
+    ///
+    /// - Parameters:
+    ///   - interface: The mobile interface from Object Manager.
+    ///   - socketFactory: How to open UDP connections to the CLUs. Keep the
+    ///     default unless a CLU answers from a different address than the one
+    ///     in the interface; then pass `AnySourceUdpSocketFactory()`.
+    ///   - logger: Where the library reports problems, such as a CLU that
+    ///     does not answer. Silent by default.
+    ///   - pingInterval: How often each CLU is checked.
+    ///   - registerInterval: How often subscriptions are renewed and all values
+    ///     re-read.
+    ///   - responseTimeout: How long to wait for a CLU to answer a request.
+    /// - Throws: An error if the interface's encryption key is invalid.
     public init(
         interface: MobileInterfaceDTO,
         socketFactory: any UdpSocketFactory = NetworkUdpSocketFactory(),
@@ -84,14 +115,17 @@ public actor GrentonSystem: CommandExecuting {
         proxy.install(self)
     }
 
-    /// Devices grouped by the CLU object they operate (spec §6.6) — one
-    /// entry per physical thermostat, shutter, relay… however many widgets
-    /// show it.
+    /// Devices grouped by what they operate on the CLU: one entry per
+    /// thermostat, shutter or relay, however many widgets show it.
+    ///
+    /// The same thermostat often appears on a room page and on a heating
+    /// page under different names. Use this list to show each piece of
+    /// hardware once.
     public nonisolated var physicalObjects: [PhysicalObject] {
         DeviceMapper.physicalObjects(for: descriptors)
     }
 
-    /// Convenience lookup across all devices.
+    /// Every entity of every device, in device order.
     public nonisolated var entities: [BoundEntity] {
         devices.flatMap(\.entities)
     }
@@ -114,8 +148,14 @@ public actor GrentonSystem: CommandExecuting {
         }
     }
 
-    /// Idempotent: sessions start, initial registration runs, loops spin up.
-    /// Serialized against stop() — overlapping calls queue.
+    // Idempotent; serialized against stop() — overlapping calls queue.
+
+    /// Connects to every CLU and subscribes to all values.
+    ///
+    /// Returns once each CLU has answered its first subscription, so every
+    /// value a CLU could report is already known. A CLU that does not answer
+    /// does not stop the others; check ``sessionStates()``. Calling `start()`
+    /// again while running does nothing.
     public func start() async {
         await beginOperation()
         defer { endOperation() }
@@ -156,10 +196,13 @@ public actor GrentonSystem: CommandExecuting {
         })
     }
 
-    /// Idempotent; `start()` may be called again afterwards (mobile
-    /// background/foreground cycle) — sessions retain their subscriptions.
-    /// Serialized against start(); cancelled tasks are AWAITED so no zombie
-    /// loop can outlive the call.
+    // Serialized against start(); cancelled tasks are AWAITED so no zombie
+    // loop can outlive the call.
+
+    /// Disconnects from every CLU.
+    ///
+    /// Entities keep their last values. Call ``start()`` again to reconnect,
+    /// for example when an app returns to the foreground.
     public func stop() async {
         await beginOperation()
         defer { endOperation() }
@@ -179,15 +222,19 @@ public actor GrentonSystem: CommandExecuting {
         }
     }
 
-    /// Re-registers the CURRENT subscription order immediately — call after
-    /// registering new keys in the store at runtime (spec §5.4.4 Δ: a
-    /// changed subscription set must not wait for the 45 s loop tick).
+    // spec §5.4.4 Δ: a changed subscription set must not wait for the loop tick.
+
+    /// Renews all subscriptions now and re-reads every value, instead of
+    /// waiting for the next periodic renewal.
     public func refreshSubscriptions() async {
         guard started else { return }
         await registerAll()
     }
 
-    /// Session states by CLU id — surface for diagnostics/UI.
+    /// The connection state of each CLU, keyed by CLU id.
+    ///
+    /// A CLU that stops answering becomes `degraded` and recovers by itself
+    /// when it answers again.
     public func sessionStates() async -> [String: SessionState] {
         var states: [String: SessionState] = [:]
         for (cluId, session) in sessions {
@@ -198,6 +245,8 @@ public actor GrentonSystem: CommandExecuting {
 
     // MARK: - Commands (CommandExecuting)
 
+    /// Sends a raw action to its CLU. Entities call this for you; use it only
+    /// for actions that no entity covers.
     public func execute(_ action: ActionRef) async throws {
         guard let session = sessions[action.cluId] else {
             logger.warning("No session for CLU \(action.cluId)")

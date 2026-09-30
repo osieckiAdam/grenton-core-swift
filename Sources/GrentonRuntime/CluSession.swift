@@ -7,25 +7,26 @@ func sleepOn<C: Clock>(_ clock: C, for duration: C.Duration) async throws {
     try await clock.sleep(until: clock.now.advanced(by: duration), tolerance: nil)
 }
 
-/// One CLU's protocol session (spec §5.4): main socket for pings/actions,
-/// one dedicated socket per ≤30-key subscription chunk, request/response
-/// correlation with timeout, and report routing by socket.
-///
-/// Concurrency model (Swift plan §4.4):
-/// - every socket has exactly ONE router task reading its `incoming`
-///   stream; operations never read sockets directly — they await
-///   continuations the router resumes;
-/// - every datagram is validated against the identity of its source
-///   (main-socket generation / endpoint id) before it may resume a pending
-///   request or publish a report — a stale router that already dequeued a
-///   datagram cannot affect a restarted session or replaced subscription;
-/// - multi-step operations (`start`, `register`, `stop`) run behind a
-///   cancellation-aware FIFO gate because actors are reentrant across
-///   `await`; a caller cancelled while queued never runs its operation;
-/// - `stop()` fails pending requests and cancels in-flight socket opens
-///   immediately (before taking the gate), so nothing drains slowly;
-/// - recovery from `degraded` re-registers the last desired subscription
-///   set before the session becomes `ready` again (spec §5.4.5).
+// One CLU's protocol session (spec §5.4): main socket for pings/actions,
+// one dedicated socket per ≤30-key subscription chunk, request/response
+// correlation with timeout, and report routing by socket.
+//
+// Concurrency model (Swift plan §4.4):
+// - every socket has exactly ONE router task reading its `incoming`
+//   stream; operations never read sockets directly — they await
+//   continuations the router resumes;
+// - every datagram is validated against the identity of its source
+//   (main-socket generation / endpoint id) before it may resume a pending
+//   request or publish a report — a stale router that already dequeued a
+//   datagram cannot affect a restarted session or replaced subscription;
+// - multi-step operations (`start`, `register`, `stop`) run behind a
+//   cancellation-aware FIFO gate because actors are reentrant across
+//   `await`; a caller cancelled while queued never runs its operation;
+// - `stop()` fails pending requests and cancels in-flight socket opens
+//   immediately (before taking the gate), so nothing drains slowly;
+// - recovery from `degraded` re-registers the last desired subscription
+//   set before the session becomes `ready` again (spec §5.4.5).
+/// The connection to one CLU. `GrentonSystem` runs one per CLU; you rarely need it directly.
 public actor CluSession {
     public let clu: Clu
 

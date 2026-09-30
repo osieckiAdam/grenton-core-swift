@@ -21,6 +21,7 @@ Provisioning (Object Manager client), encrypted UDP runtime for CLU controllers,
 | `GrentonProvisioning` | done | §4 |
 | `GrentonDevices` | done (descriptors, entities, physical objects, `GrentonSystem` facade) | §6 |
 | [`Examples/`](#examples) | small programs using the library | — |
+| [Documentation](#documentation) | DocC reference and guides | — |
 | [`grenton-cli`](#grenton-cli) | smoke tool for live installations | — |
 
 ## Quick start: try it against your installation
@@ -143,6 +144,19 @@ repository until it moves to a repository of its own.
 ```sh
 swift run grenton-cli --help
 ```
+
+## Documentation
+
+The API reference and guides (Getting Started, Concepts, Observing State,
+Controlling Devices) are written with DocC. Build and open them locally:
+
+```sh
+scripts/docs.sh
+```
+
+Then open <http://localhost:8000/documentation/grentondevices>. The first
+run fetches the DocC plugin and takes a minute or two. `scripts/docs.sh
+build` only generates the site into `.build/docs`.
 
 ## Requirements
 

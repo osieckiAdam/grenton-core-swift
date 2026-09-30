@@ -1,4 +1,4 @@
-/// Object DTOs — the `object` field of non-list widgets (spec §3.5).
+// Object DTOs — the `object` field of non-list widgets (spec §3.5).
 
 public struct ValueObjectDTO: Decodable, Sendable {
     public let value: ValueRefDTO

@@ -1,7 +1,7 @@
-/// Enumerations of the mobile-interface JSON (spec §3.4–§3.5).
-///
-/// All decode strictly: an unknown raw value fails the decode of the element
-/// that carries it, which at widget level means the widget is skipped (spec §3.6).
+// Enumerations of the mobile-interface JSON (spec §3.4–§3.5).
+//
+// All decode strictly: an unknown raw value fails the decode of the element
+// that carries it, which at widget level means the widget is skipped (spec §3.6).
 
 public enum GrentonUnit: String, Decodable, Hashable, Sendable {
     case unknown = "UNKNOWN"

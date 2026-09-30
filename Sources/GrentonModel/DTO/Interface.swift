@@ -1,23 +1,30 @@
 import Foundation
 
-/// Diagnostic record for a widget element that failed to decode and was
-/// skipped (spec §3.6 requires the skip to be observable, not silent).
+// Diagnostic record for a widget element that failed to decode and was
+// skipped (spec §3.6 requires the skip to be observable, not silent).
+/// A widget the library could not read: an unknown type, or data missing.
 public struct SkippedWidgetDiagnostic: Sendable {
-    /// The element's `type` discriminator, when it could be read.
+    // The element's `type` discriminator, when it could be read.
+    /// The widget's type, when it could be read.
     public let type: String?
-    /// Human-readable decoding failure description.
+    // Human-readable decoding failure description.
+    /// Why it was skipped, for logs.
     public let reason: String
 }
 
-/// A page of the mobile interface. Widgets decode lossily (spec §3.6):
-/// an element that fails — unknown `type`, missing field, unknown enum
-/// value — is skipped and the rest of the page survives. Skips are
-/// recorded in `skippedWidgets` for the consumer to log.
+// A page of the mobile interface. Widgets decode lossily (spec §3.6):
+// an element that fails — unknown `type`, missing field, unknown enum
+// value — is skipped and the rest of the page survives. Skips are
+// recorded in `skippedWidgets` for the consumer to log.
+/// A page of the mobile interface.
 public struct PageDTO: Decodable, Sendable {
+    /// The page title.
     public let name: String
     public let icon: String
     public let isFullscreenWidget: Bool
+    /// The widgets the library understands, in order.
     public let widgets: [WidgetDTO]
+    /// Widgets that could not be read.
     public let skippedWidgets: [SkippedWidgetDiagnostic]
 
     enum CodingKeys: String, CodingKey {
@@ -60,30 +67,39 @@ public struct PageDTO: Decodable, Sendable {
     }
 }
 
-/// Root of `mygrenton/data.json` (spec §3.4).
+// Root of `mygrenton/data.json` (spec §3.4).
+/// The mobile interface exactly as Object Manager exports it: CLUs, encryption and pages of widgets.
 public struct MobileInterfaceDTO: Decodable, Sendable {
+    /// Identifies the installation. It stays the same across exports.
     public let id: String
+    /// Changes with every export from Object Manager.
     public let version: Int
+    /// The interface name.
     public let name: String
     public let icon: String
     public let theme: GrentonTheme
     public let encryption: EncryptionDTO
+    /// Every CLU of the installation.
     public let clus: [CluDTO]
+    /// The pages, in order.
     public let pages: [PageDTO]
     public let pushNotifications: [PushNotificationDTO]
 
-    /// All widgets across all pages, in page order (spec §6.1: pages are
-    /// only a container — the device layer flattens them).
+    // All widgets across all pages, in page order (spec §6.1: pages are
+    // only a container — the device layer flattens them).
+    /// The widgets of every page, in page order.
     public var allWidgets: [WidgetDTO] {
         pages.flatMap(\.widgets)
     }
 
-    /// Diagnostics for every widget skipped during decoding, across pages.
+    // Diagnostics for every widget skipped during decoding, across pages.
+    /// Widgets that could not be read, on every page.
     public var skippedWidgets: [SkippedWidgetDiagnostic] {
         pages.flatMap(\.skippedWidgets)
     }
 
-    /// Decodes a `data.json` payload.
+    // Decodes a `data.json` payload.
+    /// Reads an interface from its JSON (`data.json`).
     public static func decode(from data: Data) throws -> MobileInterfaceDTO {
         try JSONDecoder().decode(MobileInterfaceDTO.self, from: data)
     }

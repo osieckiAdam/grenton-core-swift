@@ -1,9 +1,15 @@
-/// Dynamically-typed value used across the Grenton system (spec §3.1).
+// Dynamically-typed value used across the Grenton system (spec §3.1).
+/// A value as a CLU reports it: text, a flag, an integer, a decimal, or nothing.
 public enum GrentonValue: Hashable, Sendable {
+    /// Text.
     case string(String)
+    /// A flag.
     case bool(Bool)
+    /// An integer.
     case int(Int64)
+    /// A decimal.
     case double(Double)
+    /// The CLU reported `nil`.
     case null
 }
 

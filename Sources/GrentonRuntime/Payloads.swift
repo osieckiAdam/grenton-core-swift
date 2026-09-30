@@ -1,9 +1,9 @@
 import Foundation
 import GrentonModel
 
-/// Payload construction and parsing for the CLU message catalog (spec §5.3).
-/// String formats are byte-for-byte contracts verified against the reference
-/// implementation by the conformance suite (spec §9.5 pt 4).
+// Payload construction and parsing for the CLU message catalog (spec §5.3).
+// String formats are byte-for-byte contracts verified against the reference
+// implementation by the conformance suite (spec §9.5 pt 4).
 
 /// Parsed *client report* payload — the shape shared by the registration
 /// response and the unsolicited notification (spec §5.3.2–5.3.3).

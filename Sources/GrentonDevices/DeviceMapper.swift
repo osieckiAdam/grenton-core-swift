@@ -1,9 +1,14 @@
 import GrentonModel
 
-/// Stage 1 of the device pipeline (spec §6.1): pure widget → descriptor
-/// mapping with the completeness rules of spec §6.3. No Runtime types.
+// Stage 1 of the device pipeline (spec §6.1): pure widget → descriptor
+// mapping with the completeness rules of spec §6.3. No Runtime types.
+/// Turns an interface into devices, with no network access.
+///
+/// Use it to list an installation's devices without connecting, for example in a setup screen. ``GrentonSystem`` uses it internally.
 public enum DeviceMapper {
 
+    /// Every device of the interface, one per widget, in page order. Widgets of an unknown type are left out.
+    /// The device for one widget on a page.
     public static func descriptors(for interface: MobileInterfaceDTO) -> [DeviceDescriptor] {
         interface.pages.enumerated().flatMap { index, page in
             page.widgets.map { descriptor(for: $0, page: DevicePage(index: index, name: page.name)) }
@@ -20,10 +25,13 @@ public enum DeviceMapper {
             entities: entities(for: widget))
     }
 
-    /// Groups devices by the CLU object each entity operates (spec §6.6).
-    /// Objects appear in order of first use; each lists its widgets in
-    /// device order with the entities that belong to it. Entities without
-    /// an object (cameras) are not grouped.
+    // Groups devices by the CLU object each entity operates (spec §6.6).
+    // Objects appear in order of first use; each lists its widgets in
+    // device order with the entities that belong to it. Entities without
+    // an object (cameras) are not grouped.
+    /// Groups devices by what they operate on the CLU.
+    ///
+    /// Objects come in the order they first appear. Each lists the widgets that show it, in device order. Cameras operate nothing on a CLU and are left out.
     public static func physicalObjects(for devices: [DeviceDescriptor]) -> [PhysicalObject] {
         var order: [ObjectKey] = []
         var widgets: [ObjectKey: [PhysicalObject.Widget]] = [:]

@@ -1,51 +1,79 @@
 import GrentonModel
 
-/// Canonical device descriptors (spec §6.1 stage 1): pure values produced
-/// from DTOs with no Runtime dependency. Entity `id`s follow the suffix
-/// contract of spec §6.3 — they are the stable identity adapters key
-/// their own configuration on.
+// Canonical device descriptors (spec §6.1 stage 1): pure values produced
+// from DTOs with no Runtime dependency. Entity `id`s follow the suffix
+// contract of spec §6.3 — they are the stable identity adapters key
+// their own configuration on.
 
+/// A device as plain data: one widget of the interface, without state or commands.
+///
+/// ``DeviceMapper`` makes these from an interface with no network access, which is enough to list an installation's devices.
 public struct DeviceDescriptor: Sendable {
-    /// The widget id.
+    // The widget id.
+    /// The widget id, stable across restarts.
     public let id: String
-    /// Widget `type` discriminator (e.g. "ON_OFF") — device model name.
+    // Widget `type` discriminator (e.g. "ON_OFF") — device model name.
+    /// The widget type as Object Manager names it, such as `ON_OFF` or `THERMOSTAT_V2`.
     public let typeName: String
-    /// Canonical device kind, fixed per widget type (spec §6.1).
+    // Canonical device kind, fixed per widget type (spec §6.1).
+    /// What the device is, such as a switch, a thermostat or a shutter.
     public let kind: DeviceKind
-    /// The interface page the widget sits on (spec §6.1).
+    // The interface page the widget sits on (spec §6.1).
+    /// The interface page the widget is on.
     public let page: DevicePage
-    /// The widget label, or the non-empty labels of its components joined
-    /// with " / " for widgets without one (spec §6.1).
+    // The widget label, or the non-empty labels of its components joined
+    // with " / " for widgets without one (spec §6.1).
+    /// The widget's label, or its components' labels joined with " / " when the widget has none (such as a double switch).
     public let name: String
+    /// The things you read and control on this device.
     public let entities: [EntityDescriptor]
 }
 
-/// A page of the mobile interface: its position and its name.
+// A page of the mobile interface: its position and its name.
+/// A page of the mobile interface.
 public struct DevicePage: Hashable, Sendable {
+    /// The page's position, from 0.
     public let index: Int
+    /// The page's title, often a room.
     public let name: String
 
+    /// Creates a page reference.
     public init(index: Int, name: String) {
         self.index = index
         self.name = name
     }
 }
 
-/// What a device is, independent of the entities it exposes (spec §6.1).
+// What a device is, independent of the entities it exposes (spec §6.1).
+/// What a device is, whichever entities it has.
+///
+/// A door sensor with a button is still a ``contactSensor``.
 public enum DeviceKind: String, Sendable, CaseIterable {
+    /// An on/off switch.
     case `switch`
+    /// A dimmable light.
     case dimmableLight
+    /// A colour (RGB) light.
     case hsbLight
+    /// A door or window contact.
     case contactSensor
+    /// A value sensor.
     case sensor
+    /// A multisensor with fixed channels (temperature, humidity, CO₂…).
     case multisensor
+    /// A settable number.
     case numberSetting
+    /// A roller shutter or blind.
     case cover
+    /// One or more scenes.
     case scene
+    /// A camera.
     case camera
+    /// A thermostat.
     case thermostat
 }
 
+/// An entity as plain data: what it reads and which actions it sends. ``DeviceBinder`` turns it into a live ``BoundEntity``.
 public enum EntityDescriptor: Sendable {
     case toggle(ToggleDescriptor)
     case dimmableLight(DimmableLightDescriptor)
@@ -60,6 +88,7 @@ public enum EntityDescriptor: Sendable {
     case camera(CameraDescriptor)
     case thermostat(ThermostatDescriptor)
 
+    /// The stable id: the widget id plus a suffix.
     public var id: String {
         switch self {
         case .toggle(let d): return d.id
@@ -77,6 +106,7 @@ public enum EntityDescriptor: Sendable {
         }
     }
 
+    /// The label from the mobile interface.
     public var name: String {
         switch self {
         case .toggle(let d): return d.name
@@ -94,9 +124,10 @@ public enum EntityDescriptor: Sendable {
         }
     }
 
-    /// The CLU object this entity operates (spec §6.6): its primary state
-    /// ref, or its action when it has no state. `nil` for a camera, which
-    /// involves no CLU object.
+    // The CLU object this entity operates (spec §6.6): its primary state
+    // ref, or its action when it has no state. `nil` for a camera, which
+    // involves no CLU object.
+    /// What the entity operates on the CLU; `nil` for a camera. Entities with the same key control the same hardware.
     public var objectKey: ObjectKey? {
         switch self {
         case .toggle(let d): return ObjectKey(d.state)
@@ -114,8 +145,9 @@ public enum EntityDescriptor: Sendable {
         }
     }
 
-    /// Every ValueRef this entity reads — the binder registers them for
-    /// subscription; entity update streams filter on them.
+    // Every ValueRef this entity reads — the binder registers them for
+    // subscription; entity update streams filter on them.
+    /// Every CLU value the entity reads.
     public var stateRefs: [ValueRef] {
         switch self {
         case .toggle(let d): return [d.state]
@@ -141,7 +173,8 @@ public enum EntityDescriptor: Sendable {
 
 // MARK: - Concrete descriptors
 
-/// Switch (spec §6.3.1).
+// Switch (spec §6.3.1).
+/// The description of a ``ToggleEntity``: its id, name, and the references and actions it uses.
 public struct ToggleDescriptor: Sendable {
     public let id: String
     public let name: String
@@ -152,7 +185,8 @@ public struct ToggleDescriptor: Sendable {
     public let offIndication: String
 }
 
-/// Dimmable light (spec §6.3.2).
+// Dimmable light (spec §6.3.2).
+/// The description of a ``DimmableLightEntity``: its id, name, and the references and actions it uses.
 public struct DimmableLightDescriptor: Sendable {
     public let id: String
     public let name: String
@@ -165,7 +199,8 @@ public struct DimmableLightDescriptor: Sendable {
     public let setValueAction: ActionRef
 }
 
-/// One HSB channel: where to read it, how to set it, the device range.
+// One HSB channel: where to read it, how to set it, the device range.
+/// One channel of a colour light (hue, saturation or brightness): where to read it, how to set it, and the device's range.
 public struct HsbChannelDescriptor: Sendable {
     public let state: ValueRef
     public let setAction: ActionRef
@@ -178,7 +213,8 @@ public struct HsbChannelDescriptor: Sendable {
     }
 }
 
-/// HSB light (spec §6.3.3).
+// HSB light (spec §6.3.3).
+/// The description of a ``HsbLightEntity``: its id, name, and the references and actions it uses.
 public struct HsbLightDescriptor: Sendable {
     public let id: String
     public let name: String
@@ -190,7 +226,8 @@ public struct HsbLightDescriptor: Sendable {
     public let brightness: HsbChannelDescriptor
 }
 
-/// Contact sensor (spec §6.3.4).
+// Contact sensor (spec §6.3.4).
+/// The description of a ``ContactSensorEntity``: its id, name, and the references and actions it uses.
 public struct ContactSensorDescriptor: Sendable {
     public let id: String
     public let name: String
@@ -200,7 +237,8 @@ public struct ContactSensorDescriptor: Sendable {
     public let offIndication: String
 }
 
-/// Fixed multisensor channel kinds with canonical units (spec §6.3.6).
+// Fixed multisensor channel kinds with canonical units (spec §6.3.6).
+/// What a sensor measures. Multisensor channels have a fixed kind and unit; other sensors are ``generic``.
 public enum SensorKind: String, Sendable {
     case generic
     case co2
@@ -211,6 +249,7 @@ public enum SensorKind: String, Sendable {
     case humidity
     case temperature
 
+    /// The unit of the measured value, such as `"°C"` or `"ppm"`; `nil` for ``generic`` sensors, whose unit comes from the widget.
     public var canonicalUnit: String? {
         switch self {
         case .generic: return nil
@@ -225,19 +264,25 @@ public enum SensorKind: String, Sendable {
     }
 }
 
-/// Numeric/text sensor (spec §6.3.5–§6.3.6).
+// Numeric/text sensor (spec §6.3.5–§6.3.6).
+/// The description of a ``SensorEntity``: what it measures and how to present it.
 public struct SensorDescriptor: Sendable {
     public let id: String
     public let name: String
     public let state: ValueRef
+    /// What the sensor measures.
     public let kind: SensorKind
-    /// Presentation metadata from the widget — adapters decide how to use it.
+    // Presentation metadata from the widget — adapters decide how to use it.
+    /// The unit chosen in Object Manager, for ``SensorKind/generic`` sensors.
     public let grentonUnit: GrentonUnit?
+    /// Whether the widget shows the value as text, a decimal or an integer.
     public let valueType: GrentonValueType?
+    /// How many decimals the widget shows.
     public let precision: Int?
 }
 
-/// Settable number (spec §6.3.7).
+// Settable number (spec §6.3.7).
+/// The description of a ``NumberSettingEntity``: its id, name, and the references and actions it uses.
 public struct NumberSettingDescriptor: Sendable {
     public let id: String
     public let name: String
@@ -248,7 +293,8 @@ public struct NumberSettingDescriptor: Sendable {
     public let precision: Int
 }
 
-/// Cover with optional tilt and stop (spec §6.3.8).
+// Cover with optional tilt and stop (spec §6.3.8).
+/// The description of a ``CoverEntity``: its id, name, and the references and actions it uses.
 public struct CoverDescriptor: Sendable {
     public struct Tilt: Sendable {
         public let position: ValueRef
@@ -266,36 +312,41 @@ public struct CoverDescriptor: Sendable {
     public let stopAction: ActionRef?
 }
 
-/// Legacy roller-shutter state sensor (spec §6.3.9):
-/// 0 stopped, 1 opening, 2 closing, 3 locked, else unknown.
+// Legacy roller-shutter state sensor (spec §6.3.9):
+// 0 stopped, 1 opening, 2 closing, 3 locked, else unknown.
+/// The description of a ``StateSensorEntity``: its id, name, and the references and actions it uses.
 public struct StateSensorDescriptor: Sendable {
     public let id: String
     public let name: String
     public let state: ValueRef
 }
 
-/// Plain push button executing one action (spec §6.3.9).
+// Plain push button executing one action (spec §6.3.9).
+/// The description of a ``TriggerEntity``: its id, name, and the references and actions it uses.
 public struct TriggerDescriptor: Sendable {
     public let id: String
     public let name: String
     public let action: ActionRef
 }
 
-/// Scene trigger — a SCRIPT action with an overridable parameter (spec §6.3.10).
+// Scene trigger — a SCRIPT action with an overridable parameter (spec §6.3.10).
+/// The description of a ``SceneTriggerEntity``: its id, name, and the references and actions it uses.
 public struct SceneTriggerDescriptor: Sendable {
     public let id: String
     public let name: String
     public let action: ActionRef
 }
 
-/// Camera stream (spec §6.3.11) — Core only carries the URL.
+// Camera stream (spec §6.3.11) — Core only carries the URL.
+/// The description of a ``CameraEntity``: its id, name, and the references and actions it uses.
 public struct CameraDescriptor: Sendable {
     public let id: String
     public let name: String
     public let streamURL: String
 }
 
-/// Thermostat (spec §6.3.12) — a Grenton Thermostat virtual object.
+// Thermostat (spec §6.3.12) — a Grenton Thermostat virtual object.
+/// The description of a ``ThermostatEntity``: its id, name, and the references and actions it uses.
 public struct ThermostatDescriptor: Sendable {
     /// A readable feature with the action that writes it.
     public struct Control: Sendable {
@@ -322,12 +373,16 @@ public struct ThermostatDescriptor: Sendable {
 
 // MARK: - Physical objects (spec §6.6)
 
-/// Identity of what a widget actually operates on a CLU: an object's
-/// feature (THE1001 / 14), a variable, or a script. Several widgets (on
-/// different pages, under different names) can operate the same one. The
-/// index matters: one LED module drives separate strips on separate
-/// channels (LED1001 / 3 and / 4).
+// Identity of what a widget actually operates on a CLU: an object's
+// feature (THE1001 / 14), a variable, or a script. Several widgets (on
+// different pages, under different names) can operate the same one. The
+// index matters: one LED module drives separate strips on separate
+// channels (LED1001 / 3 and / 4).
+/// What an entity operates on a CLU: a feature of an object (such as a thermostat's temperature), a variable, or a script.
+///
+/// Entities with equal keys control the same hardware, even when they come from different widgets.
 public struct ObjectKey: Hashable, Sendable {
+    /// The kind of thing on the CLU.
     public enum Kind: String, Sendable {
         /// An object such as THE1001 or DOU1001 (attribute/method calls).
         case object
@@ -337,12 +392,17 @@ public struct ObjectKey: Hashable, Sendable {
         case script
     }
 
+    /// The CLU the object lives on.
     public let cluId: String
+    /// Object feature, variable or script.
     public let kind: Kind
+    /// The object, variable or script name on the CLU, such as `THE1001`.
     public let name: String
-    /// Feature (attribute) or method index for `.object`; `nil` otherwise.
+    // Feature (attribute) or method index for `.object`; `nil` otherwise.
+    /// The feature index for an object, such as `14` for a thermostat's temperature; `nil` for variables and scripts.
     public let index: String?
 
+    /// Creates a key.
     public init(cluId: String, kind: Kind, name: String, index: String? = nil) {
         self.cluId = cluId
         self.kind = kind
@@ -371,19 +431,30 @@ public struct ObjectKey: Hashable, Sendable {
     }
 }
 
-/// One CLU object and every widget that operates it (spec §6.6).
+// One CLU object and every widget that operates it (spec §6.6).
+/// One piece of hardware on a CLU and every widget that shows it.
+///
+/// Get the list from ``GrentonSystem/physicalObjects``.
 public struct PhysicalObject: Sendable {
-    /// A widget's view of the object: which device, where, and which of
-    /// its entities belong to this object.
+    // A widget's view of the object: which device, where, and which of
+    // its entities belong to this object.
+    /// One widget showing the object.
     public struct Widget: Sendable {
+        /// The id of the device (widget).
         public let deviceId: String
+        /// The widget type, such as `THERMOSTAT_V2`.
         public let widgetType: String
+        /// The widget's name, which can differ between pages.
         public let name: String
+        /// The page the widget is on.
         public let page: DevicePage
+        /// The widget's entities that operate this object.
         public let entityIds: [String]
     }
 
+    /// What the widgets operate.
     public let key: ObjectKey
-    /// In device order.
+    // In device order.
+    /// The widgets, in device order.
     public let widgets: [Widget]
 }

@@ -2,26 +2,48 @@ import Foundation
 import GrentonModel
 import ZIPFoundation
 
+/// Why downloading the interface failed.
 public enum ProvisioningError: Error, Sendable, Equatable {
+    /// Object Manager rejected the PIN, or its “Send to mobile devices” dialog is closed.
     case authenticationFailed
+    /// Object Manager could not be reached, or answered with an unexpected status.
     case connection(String)
+    /// The answer is not a valid interface archive.
     case invalidData(String)
 }
 
-/// Object Manager client (spec §4): one HTTP GET returns a ZIP whose
-/// `mygrenton/data.json` is the full mobile-interface definition. Needed
-/// only while provisioning — the Runtime takes the parsed interface as a
-/// value and never talks to the OM.
+// Object Manager client (spec §4): one HTTP GET returns a ZIP whose
+// `mygrenton/data.json` is the full mobile-interface definition. Needed
+// only while provisioning — the Runtime takes the parsed interface as a
+// value and never talks to the OM.
+/// Downloads the mobile interface from Grenton Object Manager.
+///
+/// Object Manager serves the interface over the local network while its “Send to mobile devices” dialog is open. The dialog shows the address, the port and the PIN (token):
+///
+/// ```swift
+/// let client = ProvisioningClient(host: "192.168.1.50")
+/// let archive = try await client.fetchInterfaceArchive(pin: "149 853")
+/// ```
+///
+/// Save the archive and load it later with ``parseInterfaceArchive(_:)``. It contains the CLU encryption key, so store it privately.
 public struct ProvisioningClient: Sendable {
+    /// The port Object Manager uses unless its dialog shows another.
     public static let defaultPort = 9998
-    /// Caps for the HTTP body and the decompressed JSON (spec §4.3 pt 4) —
-    /// protection against a zip bomb or a garbage response.
+    // Caps for the HTTP body and the decompressed JSON (spec §4.3 pt 4) —
+    // protection against a zip bomb or a garbage response.
+    /// The largest archive, and the largest interface inside it, the client accepts.
     public static let maxPayloadBytes = 10 * 1024 * 1024
 
     private let host: String
     private let port: Int
     private let session: URLSession
 
+    /// Creates a client for the computer running Object Manager.
+    ///
+    /// - Parameters:
+    ///   - host: The IP address or name shown in Object Manager's dialog.
+    ///   - port: The port shown in the dialog.
+    ///   - session: The URL session for the request.
     public init(host: String, port: Int = ProvisioningClient.defaultPort, session: URLSession = .shared) {
         self.host = host
         self.port = port
@@ -78,21 +100,31 @@ public struct ProvisioningClient: Sendable {
         return url
     }
 
-    /// `GET http://{host}:{port}/api/v1/interface/hash/{pin}` (spec §4.1).
-    /// Plain HTTP — that is how the OM speaks; the channel is LAN-only.
-    /// The app embedding this must allow local networking under ATS.
+    // `GET http://{host}:{port}/api/v1/interface/hash/{pin}` (spec §4.1).
+    // Plain HTTP — that is how the OM speaks; the channel is LAN-only.
+    // The app embedding this must allow local networking under ATS.
+    //
+    // The body is STREAMED against the 10 MB cap (spec §4.3 pt 4) — a
+    // runaway response is aborted at the limit, never fully buffered.
+    // Task cancellation is rethrown as `CancellationError`, not disguised
+    // as a connection failure.
+    /// Downloads and parses the interface.
     ///
-    /// The body is STREAMED against the 10 MB cap (spec §4.3 pt 4) — a
-    /// runaway response is aborted at the limit, never fully buffered.
-    /// Task cancellation is rethrown as `CancellationError`, not disguised
-    /// as a connection failure.
+    /// - Parameter pin: The token from Object Manager's dialog. Spaces are ignored.
+    /// - Throws: ``ProvisioningError``.
     public func fetchInterface(pin: String) async throws -> MobileInterfaceDTO {
         try Self.parseInterfaceArchive(try await fetchInterfaceArchive(pin: pin))
     }
 
-    /// The raw interface ZIP, unparsed — for consumers that cache it so a
-    /// later start needs no (short-lived) pin. Same transport rules as
-    /// `fetchInterface`; parse with `parseInterfaceArchive`.
+    // The raw interface ZIP, unparsed — for consumers that cache it so a
+    // later start needs no (short-lived) pin. Same transport rules as
+    // `fetchInterface`; parse with `parseInterfaceArchive`.
+    /// Downloads the interface as a ZIP archive, without parsing it.
+    ///
+    /// Save the archive so later starts need no PIN, and parse it with ``parseInterfaceArchive(_:)``.
+    ///
+    /// - Parameter pin: The token from Object Manager's dialog. Spaces are ignored.
+    /// - Throws: ``ProvisioningError``.
     public func fetchInterfaceArchive(pin: String) async throws -> Data {
         let url = try endpointURL(pin: pin)
 
@@ -147,9 +179,12 @@ public struct ProvisioningClient: Sendable {
         return body
     }
 
-    /// ZIP → `mygrenton/data.json` → `MobileInterfaceDTO` (spec §4.3).
-    /// Exposed for tests and for consumers that obtained the ZIP another
-    /// way (file, QR-transferred blob).
+    // ZIP → `mygrenton/data.json` → `MobileInterfaceDTO` (spec §4.3).
+    // Exposed for tests and for consumers that obtained the ZIP another
+    // way (file, QR-transferred blob).
+    /// Reads the interface from a ZIP archive saved earlier.
+    ///
+    /// - Throws: ``ProvisioningError/invalidData(_:)`` when the archive is damaged or holds no interface.
     public static func parseInterfaceArchive(_ zipData: Data) throws -> MobileInterfaceDTO {
         guard zipData.count <= maxPayloadBytes else {
             throw ProvisioningError.invalidData("response larger than \(maxPayloadBytes) bytes")
