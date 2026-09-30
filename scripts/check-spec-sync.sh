@@ -7,11 +7,15 @@
 #     points at the same commit (a spec change must reach the port).
 set -e
 cd "$(dirname "$0")/.."
+# Git runs hooks with GIT_INDEX_FILE & co. set for this repository; they
+# would point the submodule and sibling-repo commands at the wrong index.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_PREFIX
 SPEC=vendor/grenton-core-spec
 fail() { echo "spec sync: $1" >&2; exit 1; }
 
 [ -f "$SPEC/conformance/manifest.json" ] || fail "submodule missing — run: git submodule update --init"
-[ -z "$(git -C "$SPEC" status --porcelain)" ] || fail "$SPEC has local edits — change the spec in its own repository"
+status=$(git -C "$SPEC" status --porcelain) || fail "cannot read the state of $SPEC"
+[ -z "$status" ] || fail "$SPEC has local edits — change the spec in its own repository"
 
 vendored=$(python3 -c "import json;print(json.load(open('$SPEC/conformance/manifest.json'))['suiteVersion'])")
 declared=$(python3 -c "import json;print(json.load(open('Tests/GrentonConformanceTests/port.json'))['suiteVersion'])")
