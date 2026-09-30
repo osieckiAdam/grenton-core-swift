@@ -1,11 +1,25 @@
-# grenton-core-swift
+# Grenton Core for Swift
 
-Swift implementation of the **Grenton Core** specification: a portable library
-for the Grenton smart-home "mobile interface" protocol. The specification is
-language-agnostic and lives in [grenton-core-spec](https://github.com/osieckiAdam/grenton-core-spec), together with the
-conformance suite every port must pass. This repository is its Swift port.
+Control a Grenton smart home from Swift on macOS and iOS: lights, shutters,
+thermostats, scenes and sensors, over the local network, the way the
+myGrenton app does.
 
-Provisioning (Object Manager client), encrypted UDP runtime for CLU controllers, and a canonical device model, extracted from the [homeassistant-grenton](https://github.com/sszczep/homeassistant-grenton) integration.
+| | |
+|---|---|
+| **Local, no cloud** | Talks to the CLU controllers directly on your network, with their own encryption. |
+| **Every device** | Switches, dimmers, RGB lights, shutters, thermostats, scenes, sensors and cameras. |
+| **Always current** | CLUs push every change, so state stays up to date without polling. |
+| **Conformance-tested** | Implements the Grenton Core specification and passes its conformance suite. |
+
+This repository is the Swift implementation of **Grenton Core**, a portable
+library for the Grenton smart-home "mobile interface" protocol. The
+specification is language-agnostic and lives in
+[grenton-core-spec](https://github.com/osieckiAdam/grenton-core-spec), together
+with the conformance suite every port must pass. It covers provisioning (an
+Object Manager client), the encrypted UDP runtime for CLU controllers and a
+canonical device model, extracted from the
+[homeassistant-grenton](https://github.com/sszczep/homeassistant-grenton)
+integration.
 
 ## Documents
 
