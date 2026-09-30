@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Grenton Core</title>
-  <meta name="description" content="Control a Grenton smart home from your own code, over the local network.">
+  <title>Grenton Core for Swift</title>
+  <meta name="description" content="Control a Grenton smart home from Swift, over the local network.">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
   <header class="site">
     <div class="wrap">
-      <a class="brand" href="">Grenton <span>Core</span></a>
+      <a class="brand" href="">Grenton <span>Core</span><em class="lang" title="Swift implementation">Swift</em></a>
       <nav class="main" aria-label="Main">
         <a href="getting-started/">Getting Started</a>
         <a href="api/documentation/grentondevices/">API Reference</a>
@@ -21,10 +21,11 @@
 
   <section class="hero">
     <div class="wrap">
-      <h1>Grenton Core</h1>
-      <p>Control a Grenton smart home from your own code: lights, shutters,
-      thermostats, scenes and sensors, over the local network, the way the
-      myGrenton app does.</p>
+      <p class="eyebrow">Swift implementation</p>
+      <h1>Grenton Core for Swift</h1>
+      <p>Control a Grenton smart home from Swift on macOS and iOS: lights,
+      shutters, thermostats, scenes and sensors, over the local network, the
+      way the myGrenton app does.</p>
       <div class="buttons">
         <a class="button" href="getting-started/">Get Started</a>
         <a class="button secondary" href="https://github.com/osieckiAdam/grenton-core-spec">Specification on GitHub</a>
@@ -37,7 +38,7 @@
       <div class="feature"><h3>Local, no cloud</h3><p>Talks to the CLU controllers directly on your network, with their own encryption.</p></div>
       <div class="feature"><h3>Every device</h3><p>Switches, dimmers, RGB lights, shutters, thermostats, scenes, sensors and cameras.</p></div>
       <div class="feature"><h3>Always current</h3><p>CLUs push every change, so state stays up to date without polling.</p></div>
-      <div class="feature"><h3>One spec, tested</h3><p>A language-agnostic specification with a conformance suite every port must pass.</p></div>
+      <div class="feature"><h3>Conformance-tested</h3><p>Implements the Grenton Core specification and passes its conformance suite.</p></div>
     </div>
 
     <section class="install" aria-labelledby="install-title">
@@ -45,7 +46,7 @@
       <div class="tabs" role="tablist" data-tabs>
         <button role="tab" data-panel="tab-swift">Swift Package Manager</button>
         <button role="tab" data-panel="tab-source">Try it from source</button>
-        <button role="tab" data-panel="tab-port">Write a port</button>
+        <button role="tab" data-panel="tab-port">Other languages</button>
       </div>
 
       <div class="panel" id="tab-swift" role="tabpanel">
@@ -83,7 +84,8 @@ swift run list-devices dist/interface.zip</code></pre>
       </div>
 
       <div class="panel" id="tab-port" role="tabpanel" hidden>
-        <p>Grenton Core is defined by a specification, not by one implementation. A new port vendors the spec and passes its conformance suite: test cases written as data, with a thin runner in your language.</p>
+        <p>This site is for the <strong>Swift</strong> implementation. Grenton Core itself is a language-agnostic specification: every implementation follows the same rules and passes the same conformance suite, so behaviour is identical across languages.</p>
+        <p>Implementations in other languages will have their own pages and API references. To write one, start from the specification and its conformance suite:</p>
 <pre><code>git submodule add https://github.com/osieckiAdam/grenton-core-spec.git vendor/grenton-core-spec
 python3 vendor/grenton-core-spec/tools/suite.py check   <span class="c"># validate the suite</span></code></pre>
         <p><a href="https://github.com/osieckiAdam/grenton-core-spec">Specification and conformance contract →</a></p>
@@ -93,7 +95,7 @@ python3 vendor/grenton-core-spec/tools/suite.py check   <span class="c"># valida
 
   <footer class="site">
     <div class="wrap">
-      <span>Grenton Core is an independent project, not affiliated with Grenton.</span>
+      <span>The Swift implementation of the Grenton Core specification. An independent project, not affiliated with Grenton.</span>
       <span><a href="https://github.com/osieckiAdam/grenton-core-spec">Specification</a> · <a href="https://github.com/osieckiAdam/grenton-core-swift">Swift implementation</a></span>
     </div>
   </footer>

@@ -12,6 +12,7 @@
   --hero-from: #0b2a4a;
   --hero-to: #145a8f;
   --hero-text: #ffffff;
+  --swift: #f05138;
   --radius: 10px;
   --max: 1080px;
 }
@@ -59,6 +60,15 @@ header.site .wrap { display: flex; align-items: center; gap: 24px; height: 60px;
 .brand { font-weight: 700; font-size: 18px; color: var(--text); letter-spacing: -0.01em; }
 .brand:hover { text-decoration: none; }
 .brand span { color: var(--accent); }
+.brand .lang {
+  font-style: normal; font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+  color: #fff; background: var(--swift); border-radius: 999px; padding: 3px 8px;
+  margin-left: 8px; vertical-align: 2px;
+}
+.hero .eyebrow {
+  display: inline-block; font-size: 14px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  background: var(--swift); color: #fff; border-radius: 999px; padding: 5px 14px; margin: 0 0 18px; opacity: 1;
+}
 nav.main { display: flex; align-items: center; gap: 22px; margin-left: auto; }
 nav.main a { color: var(--text-soft); font-weight: 500; }
 nav.main a:hover, nav.main a[aria-current="page"] { color: var(--text); text-decoration: none; }

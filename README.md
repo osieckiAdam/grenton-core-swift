@@ -147,7 +147,7 @@ swift run grenton-cli --help
 
 ## Documentation
 
-The documentation site has three parts:
+The documentation site of the Swift implementation has three parts:
 
 - a landing page with installation instructions;
 - a Getting Started walkthrough;
