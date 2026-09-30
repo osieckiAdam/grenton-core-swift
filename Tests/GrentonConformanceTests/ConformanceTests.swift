@@ -18,10 +18,10 @@ import Testing
     }
 
     @Test(arguments: ConformanceSuite.caseIds)
-    func conformance(_ id: String) throws {
+    func conformance(_ id: String) async throws {
         let suite = try ConformanceSuite.shared.get()
         let testCase = try #require(suite.cases[id])
-        let observed = try Operations.run(testCase)
+        let observed = try await Operations.run(testCase)
         let expected = Operations.normalizeExpected(testCase.expect)
         let difference = expected.firstDifference(from: observed)
 

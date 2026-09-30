@@ -102,7 +102,14 @@ enum Operations {
     /// Runs one case and returns its observed `expect`-shaped outcome.
     /// Errors from the production API become `error` outcomes; a missing
     /// handler or undecodable input is a runner failure (thrown).
-    static func run(_ testCase: ConformanceCase) throws -> JSON {
+    static func run(_ testCase: ConformanceCase) async throws -> JSON {
+        if testCase.operation == "session.scenario" {
+            // Stateful and asynchronous (conformance.md §4b), so it bypasses
+            // the synchronous registry.
+            guard let steps = testCase.input["steps"]?.arrayValue else { throw SuiteError("session.scenario: no steps") }
+            let observed = try await SessionScenario(input: testCase.input).run(steps)
+            return .object(["outcome": .string("ok"), "value": observed])
+        }
         guard let handler = registry[testCase.operation] else {
             throw SuiteError("no handler for operation \(testCase.operation)")
         }
