@@ -4,12 +4,14 @@ public API, as an app would use it.
 
     scripts/check-doc-snippets.py
 
-Collects the ```swift blocks of every DocC article (Sources/*/*.docc) and
-the code blocks of every `///` doc comment, wraps each article or comment in
+Collects the ```swift blocks of every DocC article (Sources/*/*.docc), the
+`language-swift` blocks of the site pages (site/), and the code blocks of
+every `///` doc comment, wraps each article or comment in
 a function, and builds them as a separate package that depends on this one.
 Blocks may use `system`, `entity` and `interface` without declaring them.
 Blocks containing `.package(` (Package.swift excerpts) are skipped.
 """
+import html
 import pathlib
 import re
 import subprocess
@@ -25,6 +27,12 @@ def article_groups():
     for path in sorted(ROOT.glob("Sources/*/*.docc/*.md")):
         blocks = re.findall(r"```swift\n(.*?)```", path.read_text(), re.S)
         yield str(path.relative_to(ROOT)), blocks
+
+
+def site_groups():
+    for path in sorted(ROOT.glob("site/**/*.html")):
+        blocks = re.findall(r'<code class="language-swift">(.*?)</code>', path.read_text(), re.S)
+        yield str(path.relative_to(ROOT)), [html.unescape(re.sub(r"<[^>]+>", "", b)) for b in blocks]
 
 
 def comment_groups():
@@ -57,7 +65,7 @@ def wrap(index, origin, blocks):
 
 
 functions = []
-for origin, blocks in list(article_groups()) + list(comment_groups()):
+for origin, blocks in list(article_groups()) + list(site_groups()) + list(comment_groups()):
     code = wrap(len(functions), origin, blocks)
     if code:
         functions.append(code)

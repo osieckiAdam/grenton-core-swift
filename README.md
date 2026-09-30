@@ -147,16 +147,22 @@ swift run grenton-cli --help
 
 ## Documentation
 
-The API reference and guides (Getting Started, Concepts, Observing State,
-Controlling Devices) are written with DocC. Build and open them locally:
+The documentation site has three parts:
+
+- a landing page with installation instructions;
+- a Getting Started walkthrough;
+- the DocC API reference with its guides (Getting Started, Concepts, Observing State, Controlling Devices).
+
+Build it and open it locally:
 
 ```sh
 scripts/docs.sh
 ```
 
-Then open <http://localhost:8000/documentation/grentondevices>. The first
-run fetches the DocC plugin and takes a minute or two. `scripts/docs.sh
-build` only generates the site into `.build/docs`.
+Then open <http://localhost:8000/>. The first run fetches the DocC plugin and
+takes a minute or two. `scripts/docs.sh build` only generates the site into
+`.build/site`. The hand-written pages are in `site/`; the reference comes
+from the doc comments and the `.docc` catalogs.
 
 ## Requirements
 

@@ -12,7 +12,7 @@ port, the docs and the examples, and the gates.
 - `scripts/check.sh`: the full gate, also run by the pre-push hook. `scripts/check.sh quick` runs the fast part.
 - `scripts/impact.sh`: what a change touches and what it implies.
 - `swift test`: unit tests plus the conformance suite.
-- `scripts/docs.sh`: build the DocC site and serve it at http://localhost:8000/documentation/grentondevices/.
+- `scripts/docs.sh`: build the documentation site and serve it at http://localhost:8000/. It covers the landing page and Getting Started from `site/`, plus the DocC reference under `api/`.
 - Git hooks live in `scripts/hooks`. Enable them once per clone: `git config core.hooksPath scripts/hooks`.
 
 ## Layout
@@ -21,7 +21,8 @@ port, the docs and the examples, and the gates.
 - `Sources/GrentonRuntime`: CLU sessions, transport, state store.
 - `Sources/GrentonProvisioning`: Object Manager client.
 - `Sources/GrentonDevices`: devices, entities, physical objects, `GrentonSystem`. This is the user-facing module.
-- `Sources/*/*.docc`: DocC articles.
+- `Sources/*/*.docc`: DocC articles. `GrentonDevices.docc/header.html` is the site navigation shown on every reference page; the other catalogs symlink it.
+- `site/`: the hand-written site pages (landing page with install tabs, Getting Started) and their CSS/JS.
 - `Examples/`: library examples.
 - `Examples/grenton-cli`: the smoke tool. It will move to its own repository.
 - `Tests/GrentonConformanceTests`: the conformance runner, with `port.json` declaring the suite version, profiles and skips.

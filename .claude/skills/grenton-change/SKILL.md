@@ -69,8 +69,9 @@ When unsure whether the spec describes it, grep `vendor/grenton-core-spec/spec/g
   `GrentonDevices.docc/` (GettingStarted, Concepts, ObservingState,
   ControllingDevices). Their code and every code block in a `///` comment
   are compiled by `scripts/check-doc-snippets.py`.
+- The site in `site/` repeats the user journey. The landing page has install tabs and a Swift example; `site/getting-started/` has the walkthrough. When commands, example names or the install steps change, update these pages, and README, together. Their `language-swift` code blocks are compiled too. `scripts/check-site-links.py` fails on broken internal links.
 - DocC runs with warnings as errors, so broken ``links`` fail the build.
-- Preview with `scripts/docs.sh`, at http://localhost:8000/documentation/grentondevices/.
+- Preview with `scripts/docs.sh`, at http://localhost:8000/.
 
 ## 5. Examples and README
 

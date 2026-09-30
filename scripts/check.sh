@@ -26,7 +26,7 @@ else
     echo "tests failed — full log: .build/check-tests.log" >&2
     exit 1
 fi
-step "Documentation (warnings are errors)"
+step "Documentation site (DocC warnings are errors)"
 if scripts/docs.sh build > .build/check-docs.log 2>&1; then
     echo "documentation: built without warnings"
 else
@@ -34,6 +34,7 @@ else
     echo "documentation failed — full log: .build/check-docs.log" >&2
     exit 1
 fi
+step "Site links";         scripts/check-site-links.py
 step "Doc snippets";       scripts/check-doc-snippets.py
 
 echo

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grenton Core</title>
+  <meta name="description" content="Control a Grenton smart home from your own code, over the local network.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <header class="site">
+    <div class="wrap">
+      <a class="brand" href="">Grenton <span>Core</span></a>
+      <nav class="main" aria-label="Main">
+        <a href="getting-started/">Getting Started</a>
+        <a href="api/documentation/grentondevices/">API Reference</a>
+        <a class="github" href="https://github.com/osieckiAdam/grenton-core-spec" title="Grenton Core specification on GitHub" aria-label="Grenton Core specification on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wrap">
+      <h1>Grenton Core</h1>
+      <p>Control a Grenton smart home from your own code: lights, shutters,
+      thermostats, scenes and sensors, over the local network, the way the
+      myGrenton app does.</p>
+      <div class="buttons">
+        <a class="button" href="getting-started/">Get Started</a>
+        <a class="button secondary" href="https://github.com/osieckiAdam/grenton-core-spec">Specification on GitHub</a>
+      </div>
+    </div>
+  </section>
+
+  <main class="wrap">
+    <div class="features">
+      <div class="feature"><h3>Local, no cloud</h3><p>Talks to the CLU controllers directly on your network, with their own encryption.</p></div>
+      <div class="feature"><h3>Every device</h3><p>Switches, dimmers, RGB lights, shutters, thermostats, scenes, sensors and cameras.</p></div>
+      <div class="feature"><h3>Always current</h3><p>CLUs push every change, so state stays up to date without polling.</p></div>
+      <div class="feature"><h3>One spec, tested</h3><p>A language-agnostic specification with a conformance suite every port must pass.</p></div>
+    </div>
+
+    <section class="install" aria-labelledby="install-title">
+      <h2 id="install-title">Installation</h2>
+      <div class="tabs" role="tablist" data-tabs>
+        <button role="tab" data-panel="tab-swift">Swift Package Manager</button>
+        <button role="tab" data-panel="tab-source">Try it from source</button>
+        <button role="tab" data-panel="tab-port">Write a port</button>
+      </div>
+
+      <div class="panel" id="tab-swift" role="tabpanel">
+        <p>Add the package to <code>Package.swift</code> (macOS 13+, iOS 16+):</p>
+<pre><code>dependencies: [
+    .package(url: "https://github.com/osieckiAdam/grenton-core-swift.git", branch: "main"),
+],
+targets: [
+    .target(name: "MyApp", dependencies: [
+        .product(name: "GrentonProvisioning", package: "grenton-core-swift"),
+        .product(name: "GrentonDevices", package: "grenton-core-swift"),
+    ]),
+]</code></pre>
+        <p>Load the interface exported by Object Manager and list your lights:</p>
+<pre><code class="language-swift">import GrentonProvisioning
+import GrentonDevices
+
+let archive = try Data(contentsOf: URL(fileURLWithPath: "interface.zip"))
+let system = try GrentonSystem(interface: ProvisioningClient.parseInterfaceArchive(archive))
+await system.start()
+
+for light in system.entities.compactMap(\.switchable) {
+    print(light.name, light.isOn == true ? "on" : "off")
+}</code></pre>
+        <p><a href="api/documentation/grentondevices/gettingstarted/">Using the library →</a></p>
+      </div>
+
+      <div class="panel" id="tab-source" role="tabpanel" hidden>
+        <p>Clone the Swift implementation and run the examples against your installation. No build step; <code>swift run</code> does it:</p>
+<pre><code>git clone https://github.com/osieckiAdam/grenton-core-swift.git
+cd grenton-core-swift
+swift run fetch-interface 192.168.1.50 dist/interface.zip 149 853
+swift run list-devices dist/interface.zip</code></pre>
+        <p><a href="getting-started/">The whole walkthrough →</a></p>
+      </div>
+
+      <div class="panel" id="tab-port" role="tabpanel" hidden>
+        <p>Grenton Core is defined by a specification, not by one implementation. A new port vendors the spec and passes its conformance suite: test cases written as data, with a thin runner in your language.</p>
+<pre><code>git submodule add https://github.com/osieckiAdam/grenton-core-spec.git vendor/grenton-core-spec
+python3 vendor/grenton-core-spec/tools/suite.py check   <span class="c"># validate the suite</span></code></pre>
+        <p><a href="https://github.com/osieckiAdam/grenton-core-spec">Specification and conformance contract →</a></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site">
+    <div class="wrap">
+      <span>Grenton Core is an independent project, not affiliated with Grenton.</span>
+      <span><a href="https://github.com/osieckiAdam/grenton-core-spec">Specification</a> · <a href="https://github.com/osieckiAdam/grenton-core-swift">Swift implementation</a></span>
+    </div>
+  </footer>
+  <script src="assets/site.js"></script>
+</body>
+</html>
