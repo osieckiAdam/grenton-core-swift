@@ -1,0 +1,6 @@
+#!/bin/sh
+# The full gate before anything leaves the machine.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+scripts/impact.sh
+scripts/check.sh

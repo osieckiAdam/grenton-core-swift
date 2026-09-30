@@ -8,13 +8,13 @@ import GrentonModel
 public enum DeviceMapper {
 
     /// Every device of the interface, one per widget, in page order. Widgets of an unknown type are left out.
-    /// The device for one widget on a page.
     public static func descriptors(for interface: MobileInterfaceDTO) -> [DeviceDescriptor] {
         interface.pages.enumerated().flatMap { index, page in
             page.widgets.map { descriptor(for: $0, page: DevicePage(index: index, name: page.name)) }
         }
     }
 
+    /// The device for one widget on a page.
     public static func descriptor(for widget: WidgetDTO, page: DevicePage) -> DeviceDescriptor {
         DeviceDescriptor(
             id: widget.id,

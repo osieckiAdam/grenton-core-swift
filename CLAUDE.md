@@ -1,0 +1,35 @@
+# grenton-core-swift
+
+Swift port of the Grenton Core spec. The spec and conformance suite live in
+`grenton-core-spec`, vendored as the `vendor/grenton-core-spec` submodule.
+
+**For any change, follow the `grenton-change` skill**
+(`.claude/skills/grenton-change/SKILL.md`). It covers spec first, then the
+port, the docs and the examples, and the gates.
+
+## Commands
+
+- `scripts/check.sh`: the full gate, also run by the pre-push hook. `scripts/check.sh quick` runs the fast part.
+- `scripts/impact.sh`: what a change touches and what it implies.
+- `swift test`: unit tests plus the conformance suite.
+- `scripts/docs.sh`: build the DocC site and serve it at http://localhost:8000/documentation/grentondevices/.
+- Git hooks live in `scripts/hooks`. Enable them once per clone: `git config core.hooksPath scripts/hooks`.
+
+## Layout
+
+- `Sources/GrentonModel`: interface DTOs and values.
+- `Sources/GrentonRuntime`: CLU sessions, transport, state store.
+- `Sources/GrentonProvisioning`: Object Manager client.
+- `Sources/GrentonDevices`: devices, entities, physical objects, `GrentonSystem`. This is the user-facing module.
+- `Sources/*/*.docc`: DocC articles.
+- `Examples/`: library examples.
+- `Examples/grenton-cli`: the smoke tool. It will move to its own repository.
+- `Tests/GrentonConformanceTests`: the conformance runner, with `port.json` declaring the suite version, profiles and skips.
+- `dist/`: git-ignored. It holds the user's saved interface, which contains the CLU encryption key. Never commit it.
+
+## Rules
+
+- The spec is normative text, not a log (see the skill).
+- No identifiers of the user's real installation in files or commit messages.
+- Live runs happen in Terminal.app, not VS Code, because of Local Network privacy. Writes that change the house need the user's go-ahead.
+- GrentonModel and GrentonRuntime are not docs-gated yet. Much of their public API is plumbing between modules and should become `package` access.

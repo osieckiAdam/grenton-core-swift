@@ -14,7 +14,7 @@ swift package --allow-writing-to-directory "$OUTPUT" generate-documentation \
     --target GrentonModel --target GrentonRuntime \
     --target GrentonProvisioning --target GrentonDevices \
     --enable-experimental-combined-documentation \
-    --transform-for-static-hosting \
+    --transform-for-static-hosting --warnings-as-errors \
     --output-path "$OUTPUT"
 
 # DocC can report an error and still exit 0; make sure the site exists.

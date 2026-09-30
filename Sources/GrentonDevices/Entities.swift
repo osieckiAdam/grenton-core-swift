@@ -11,9 +11,12 @@ public protocol CommandExecuting: Sendable {
 /// Everything a live entity needs: synchronous state reads and command
 /// execution. Value type — cheap to hand to every entity.
 public struct DeviceContext: Sendable {
+    /// Where entities read their state.
     public let store: StateStore
+    /// Where entities send their commands.
     public let executor: any CommandExecuting
 
+    /// Creates a context from a store and a command executor.
     public init(store: StateStore, executor: any CommandExecuting) {
         self.store = store
         self.executor = executor
@@ -168,6 +171,7 @@ extension SwitchableEntity {
 /// Builds live devices from descriptors. ``GrentonSystem`` does this for
 /// you; use it only to run devices on your own store and command executor.
 public enum DeviceBinder {
+    /// Turns descriptors into live devices, registering every value they read in the store.
     public static func bind(
         _ descriptors: [DeviceDescriptor], context: DeviceContext
     ) -> [BoundDevice] {

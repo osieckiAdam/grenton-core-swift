@@ -176,36 +176,56 @@ public enum EntityDescriptor: Sendable {
 // Switch (spec §6.3.1).
 /// The description of a ``ToggleEntity``: its id, name, and the references and actions it uses.
 public struct ToggleDescriptor: Sendable {
+    /// The entity's stable id: the widget id plus a suffix.
     public let id: String
+    /// The label from the mobile interface.
     public let name: String
+    /// The CLU value the entity reads.
     public let state: ValueRef
+    /// The action that turns it on.
     public let onAction: ActionRef
+    /// The action that turns it off.
     public let offAction: ActionRef
+    /// The label the widget shows when on.
     public let onIndication: String
+    /// The label the widget shows when off.
     public let offIndication: String
 }
 
 // Dimmable light (spec §6.3.2).
 /// The description of a ``DimmableLightEntity``: its id, name, and the references and actions it uses.
 public struct DimmableLightDescriptor: Sendable {
+    /// The entity's stable id: the widget id plus a suffix.
     public let id: String
+    /// The label from the mobile interface.
     public let name: String
+    /// The CLU value the entity reads.
     public let state: ValueRef
+    /// The lowest device value.
     public let min: Double
+    /// The highest device value.
     public let max: Double
+    /// How many decimals values are rounded to.
     public let precision: Int
+    /// The action that turns it on.
     public let onAction: ActionRef
+    /// The action that turns it off.
     public let offAction: ActionRef
+    /// The action that sets a new value; its value is replaced when sent.
     public let setValueAction: ActionRef
 }
 
 // One HSB channel: where to read it, how to set it, the device range.
 /// One channel of a colour light (hue, saturation or brightness): where to read it, how to set it, and the device's range.
 public struct HsbChannelDescriptor: Sendable {
+    /// The CLU value the entity reads.
     public let state: ValueRef
+    /// The action that sets this value; its value is replaced when sent.
     public let setAction: ActionRef
+    /// The device's range for this channel.
     public let range: (min: Double, max: Double)
 
+    /// Creates a channel.
     public init(state: ValueRef, setAction: ActionRef, range: (min: Double, max: Double)) {
         self.state = state
         self.setAction = setAction
@@ -216,24 +236,38 @@ public struct HsbChannelDescriptor: Sendable {
 // HSB light (spec §6.3.3).
 /// The description of a ``HsbLightEntity``: its id, name, and the references and actions it uses.
 public struct HsbLightDescriptor: Sendable {
+    /// The entity's stable id: the widget id plus a suffix.
     public let id: String
+    /// The label from the mobile interface.
     public let name: String
+    /// The CLU value that says whether the light is on.
     public let powerState: ValueRef
+    /// The action that turns it on.
     public let onAction: ActionRef
+    /// The action that turns it off.
     public let offAction: ActionRef
+    /// The hue channel.
     public let hue: HsbChannelDescriptor
+    /// The saturation channel.
     public let saturation: HsbChannelDescriptor
+    /// The brightness channel.
     public let brightness: HsbChannelDescriptor
 }
 
 // Contact sensor (spec §6.3.4).
 /// The description of a ``ContactSensorEntity``: its id, name, and the references and actions it uses.
 public struct ContactSensorDescriptor: Sendable {
+    /// The entity's stable id: the widget id plus a suffix.
     public let id: String
+    /// The label from the mobile interface.
     public let name: String
+    /// The CLU value the entity reads.
     public let state: ValueRef
+    /// Whether the sensor's reading is inverted (the widget's “reverse state”).
     public let reversed: Bool
+    /// The label the widget shows when on.
     public let onIndication: String
+    /// The label the widget shows when off.
     public let offIndication: String
 }
 
@@ -267,8 +301,11 @@ public enum SensorKind: String, Sendable {
 // Numeric/text sensor (spec §6.3.5–§6.3.6).
 /// The description of a ``SensorEntity``: what it measures and how to present it.
 public struct SensorDescriptor: Sendable {
+    /// The entity's stable id: the widget id plus a suffix.
     public let id: String
+    /// The label from the mobile interface.
     public let name: String
+    /// The CLU value the entity reads.
     public let state: ValueRef
     /// What the sensor measures.
     public let kind: SensorKind
@@ -284,31 +321,46 @@ public struct SensorDescriptor: Sendable {
 // Settable number (spec §6.3.7).
 /// The description of a ``NumberSettingEntity``: its id, name, and the references and actions it uses.
 public struct NumberSettingDescriptor: Sendable {
+    /// The entity's stable id: the widget id plus a suffix.
     public let id: String
+    /// The label from the mobile interface.
     public let name: String
+    /// The CLU value the entity reads.
     public let state: ValueRef
+    /// The action that sets a new value; its value is replaced when sent.
     public let setValueAction: ActionRef
+    /// The lowest device value.
     public let min: Double
+    /// The highest device value.
     public let max: Double
+    /// How many decimals values are rounded to.
     public let precision: Int
 }
 
 // Cover with optional tilt and stop (spec §6.3.8).
 /// The description of a ``CoverEntity``: its id, name, and the references and actions it uses.
 public struct CoverDescriptor: Sendable {
+    /// The slats of a shutter: where their tilt is read and how it is set.
     public struct Tilt: Sendable {
+        /// The CLU value holding the position.
         public let position: ValueRef
+        /// The action that sets this value; its value is replaced when sent.
         public let setAction: ActionRef
     }
 
+    /// The entity's stable id: the widget id plus a suffix.
     public let id: String
+    /// The label from the mobile interface.
     public let name: String
     /// Raw motion enum: 0 idle, 1 opening, 2 closing.
     public let motionState: ValueRef
     /// Raw position 0...100 (0 = closed).
     public let position: ValueRef
+    /// The action that moves it to a position.
     public let setPositionAction: ActionRef
+    /// The slats, when the shutter has them.
     public let tilt: Tilt?
+    /// The action that stops it; `nil` when the widget has none.
     public let stopAction: ActionRef?
 }
 
@@ -316,32 +368,44 @@ public struct CoverDescriptor: Sendable {
 // 0 stopped, 1 opening, 2 closing, 3 locked, else unknown.
 /// The description of a ``StateSensorEntity``: its id, name, and the references and actions it uses.
 public struct StateSensorDescriptor: Sendable {
+    /// The entity's stable id: the widget id plus a suffix.
     public let id: String
+    /// The label from the mobile interface.
     public let name: String
+    /// The CLU value the entity reads.
     public let state: ValueRef
 }
 
 // Plain push button executing one action (spec §6.3.9).
 /// The description of a ``TriggerEntity``: its id, name, and the references and actions it uses.
 public struct TriggerDescriptor: Sendable {
+    /// The entity's stable id: the widget id plus a suffix.
     public let id: String
+    /// The label from the mobile interface.
     public let name: String
+    /// The action it runs.
     public let action: ActionRef
 }
 
 // Scene trigger — a SCRIPT action with an overridable parameter (spec §6.3.10).
 /// The description of a ``SceneTriggerEntity``: its id, name, and the references and actions it uses.
 public struct SceneTriggerDescriptor: Sendable {
+    /// The entity's stable id: the widget id plus a suffix.
     public let id: String
+    /// The label from the mobile interface.
     public let name: String
+    /// The action it runs.
     public let action: ActionRef
 }
 
 // Camera stream (spec §6.3.11) — Core only carries the URL.
 /// The description of a ``CameraEntity``: its id, name, and the references and actions it uses.
 public struct CameraDescriptor: Sendable {
+    /// The entity's stable id: the widget id plus a suffix.
     public let id: String
+    /// The label from the mobile interface.
     public let name: String
+    /// The stream address, such as an RTSP URL.
     public let streamURL: String
 }
 
@@ -350,18 +414,25 @@ public struct CameraDescriptor: Sendable {
 public struct ThermostatDescriptor: Sendable {
     /// A readable feature with the action that writes it.
     public struct Control: Sendable {
+        /// The CLU value the entity reads.
         public let state: ValueRef
+        /// The action that sets this value; its value is replaced when sent.
         public let setAction: ActionRef
     }
 
+    /// The entity's stable id: the widget id plus a suffix.
     public let id: String
+    /// The label from the mobile interface.
     public let name: String
+    /// The CLU value with the measured temperature.
     public let currentTemperature: ValueRef
     /// Effective target (TargetTemp) — follows the mode (manual/holiday/schedule).
     public let targetTemperature: ValueRef
     /// Writes the manual set point (PointValue).
     public let setTargetTemperatureAction: ActionRef
+    /// The CLU value with the lowest allowed target, if exposed.
     public let minTemperature: ValueRef?
+    /// The CLU value with the highest allowed target, if exposed.
     public let maxTemperature: ValueRef?
     /// Mode feature: 0 manual, 1 holiday, 2 schedule.
     public let mode: Control?
