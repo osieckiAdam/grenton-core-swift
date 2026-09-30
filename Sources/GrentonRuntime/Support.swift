@@ -1,0 +1,98 @@
+import Foundation
+import GrentonModel
+
+/// Session lifecycle state (spec §5.4.5).
+public enum SessionState: Sendable, Equatable {
+    case idle
+    case starting
+    case ready
+    /// Loops keep running but the CLU is not answering; a successful ping
+    /// returns the session to `ready`.
+    case degraded
+    case stopped
+}
+
+public enum SessionError: Error, Sendable, Equatable {
+    case notConnected
+    case connectionClosed
+    case timeout
+    /// A request with this message id is already awaiting a response
+    /// (overlapping ping, or a — vanishingly unlikely — random collision).
+    case duplicateMessageId
+}
+
+public enum TransportError: Error, Sendable, Equatable {
+    /// Port outside 1...65535 — validated here, not in the Model (spec §3.4).
+    case invalidPort(Int)
+    case connectionFailed(String)
+}
+
+/// Result slot of a registration position (spec §5.4.2): distinguishes a
+/// failed chunk from a real value — including a real `nil` from the CLU.
+public enum RegistrationSlot: Sendable, Equatable {
+    case failed
+    case value(GrentonValue)
+}
+
+/// Report delivered by a subscription socket: the chunk's keys paired
+/// positionally with the reported values.
+public struct ChunkReport: Sendable, Equatable {
+    public let keys: [ValueRef]
+    public let slots: [RegistrationSlot]
+
+    public init(keys: [ValueRef], slots: [RegistrationSlot]) {
+        self.keys = keys
+        self.slots = slots
+    }
+}
+
+// MARK: - Injected effects (spec §7)
+
+/// Randomness boundary (spec §7.5) — injected so tests are deterministic.
+public protocol RandomSource: Sendable {
+    func bytes(_ count: Int) -> [UInt8]
+    func int(in range: ClosedRange<Int>) -> Int
+}
+
+public struct SystemRandomSource: RandomSource {
+    public init() {}
+    public func bytes(_ count: Int) -> [UInt8] {
+        (0..<count).map { _ in UInt8.random(in: .min ... .max) }
+    }
+    public func int(in range: ClosedRange<Int>) -> Int {
+        Int.random(in: range)
+    }
+}
+
+extension RandomSource {
+    /// 4 random bytes as 8 lowercase hex chars (spec §5.2).
+    func messageId() -> String {
+        bytes(4).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+/// Logging facade (spec §7.6) — the library never logs directly.
+public struct GrentonLogger: Sendable {
+    public enum Level: Int, Sendable, Comparable {
+        case debug = 0, info, warning, error
+        public static func < (lhs: Level, rhs: Level) -> Bool { lhs.rawValue < rhs.rawValue }
+    }
+
+    private let handler: @Sendable (Level, String) -> Void
+
+    public init(handler: @escaping @Sendable (Level, String) -> Void) {
+        self.handler = handler
+    }
+
+    public static let disabled = GrentonLogger { _, _ in }
+
+    /// Prints to stdout — for CLI tools and debugging, not production apps.
+    public static let standardOutput = GrentonLogger { level, message in
+        print("[grenton][\(level)] \(message)")
+    }
+
+    public func debug(_ message: @autoclosure () -> String) { handler(.debug, message()) }
+    public func info(_ message: @autoclosure () -> String) { handler(.info, message()) }
+    public func warning(_ message: @autoclosure () -> String) { handler(.warning, message()) }
+    public func error(_ message: @autoclosure () -> String) { handler(.error, message()) }
+}

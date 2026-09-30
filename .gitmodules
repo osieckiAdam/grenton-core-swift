@@ -1,0 +1,3 @@
+[submodule "vendor/grenton-core-spec"]
+	path = vendor/grenton-core-spec
+	url = https://github.com/osieckiAdam/grenton-core-spec.git

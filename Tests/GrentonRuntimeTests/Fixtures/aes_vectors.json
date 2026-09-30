@@ -1,0 +1,35 @@
+{
+  "keyBase64": "AAECAwQFBgcICQoLDA0ODw==",
+  "ivBase64": "EBESExQVFhcYGRobHB0eHw==",
+  "vectors": [
+    {
+      "name": "ping request",
+      "plaintext": "req::aabbccdd:checkAlive()",
+      "ciphertextHex": "5eab3361763eb47aecf01654656faa9b4e31ef685544739464c5291048d6ab60"
+    },
+    {
+      "name": "clientRegister request",
+      "plaintext": "req::0f3e9a11:SYSTEM:clientRegister(0,12345,1,{\"AnalogIn1\",{DOU8272,0}})",
+      "ciphertextHex": "32a53db2c8eb9ad8e14bd127c466c22f3ed8932f5614c2a355d3e57fee6e5aec934236153383944a680ec2c811803421df6a81a75c9be4370bfe85a669b47ffdb62893c77bc792803ca88917ac3fa61a"
+    },
+    {
+      "name": "clientReport notification",
+      "plaintext": "resp:192.168.1.10:00000000:clientReport:0:{21.5,\"ON\"}",
+      "ciphertextHex": "9d53460871ebf060f96fe81c68fcd85ff81ed07fad264a4106ddeeb511329c8cafed3face4e8a334d20e5b307ddf62cb2ab676e0e1a0527242489ba39349b644"
+    }
+  ],
+  "invalidPadding": [
+    {
+      "name": "padding length 0",
+      "ciphertextHex": "2c909b86ff801a12cf4db7a20179cdf1"
+    },
+    {
+      "name": "padding bytes mismatch (02 02 02 03)",
+      "ciphertextHex": "7afcd5f8da7c5529ea3a236aacf47bae"
+    },
+    {
+      "name": "padding length 0x11 (> block size)",
+      "ciphertextHex": "6b6c1a22683ad2256be95f06fac03a7d"
+    }
+  ]
+}

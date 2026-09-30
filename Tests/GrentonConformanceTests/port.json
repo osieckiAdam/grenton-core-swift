@@ -1,0 +1,5 @@
+{
+  "suiteVersion": "0.4.3",
+  "profiles": ["stateless", "mapping"],
+  "skips": []
+}

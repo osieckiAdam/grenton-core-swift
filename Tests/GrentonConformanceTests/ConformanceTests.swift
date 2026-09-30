@@ -1,0 +1,33 @@
+import Testing
+
+/// Runs the grenton-core-spec conformance suite against this port.
+/// Declared profiles and skips live in `port.json`.
+@Suite struct ConformanceTests {
+    @Test func suiteIsPresentIntactAndDeclared() throws {
+        let suite = try ConformanceSuite.shared.get()
+        #expect(!suite.cases.isEmpty)
+        for skip in suite.port.skips {
+            #expect(!skip.reason.isEmpty, "skip \(skip.id) needs a reason")
+        }
+    }
+
+    @Test(arguments: ConformanceSuite.caseIds)
+    func conformance(_ id: String) throws {
+        let suite = try ConformanceSuite.shared.get()
+        let testCase = try #require(suite.cases[id])
+        let observed = try Operations.run(testCase)
+        let expected = Operations.normalizeExpected(testCase.expect)
+        let difference = expected.firstDifference(from: observed)
+
+        if suite.skippedIds.contains(id) {
+            // A skip that passes is stale — fail so it gets removed.
+            #expect(difference != nil, "\(id) is skipped in port.json but passes — remove the skip")
+            return
+        }
+        #expect(difference == nil, """
+            \(id) differs at \(difference ?? "")
+              expected: \(expected)
+              observed: \(observed)
+            """)
+    }
+}
