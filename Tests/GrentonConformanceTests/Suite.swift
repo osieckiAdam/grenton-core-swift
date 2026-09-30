@@ -100,6 +100,12 @@ struct ConformanceSuite: Sendable {
             }
         }
 
+        // Requirement ids a case may cite (conformance.md §2, §6).
+        guard case .object(let requirementTable)? = manifest["requirements"] else {
+            throw SuiteError("manifest.json lacks requirements")
+        }
+        let requirements = Set(requirementTable.keys)
+
         var cases: [String: ConformanceCase] = [:]
         var listedPaths: Set<String> = []
         for entry in entries {
@@ -111,8 +117,14 @@ struct ConformanceSuite: Sendable {
             let data = try Data(contentsOf: conformanceRoot.appendingPathComponent(path))
             guard sha256(data) == hash else { throw SuiteError("\(path): SHA-256 does not match the manifest") }
 
+            guard path.hasPrefix("cases/"), (path as NSString).lastPathComponent == "\(id).json" else {
+                throw SuiteError("\(path): a case lives under cases/ in a file named after its id (\(id).json)")
+            }
             let doc = try JSON.decode(data)
             try validateCaseShape(doc, path: path)
+            for ref in doc["specRefs"]?.arrayValue ?? [] where !requirements.contains(ref.stringValue ?? "") {
+                throw SuiteError("\(path): unknown requirement \(ref) in specRefs")
+            }
             guard doc["id"]?.stringValue == id, let operation = doc["operation"]?.stringValue,
                   let input = doc["input"], let expect = doc["expect"] else {
                 throw SuiteError("\(path): id does not match the manifest")

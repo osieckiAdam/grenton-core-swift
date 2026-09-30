@@ -124,7 +124,6 @@ enum Operations {
         case ProvisioningError.authenticationFailed: return "provisioning.authenticationFailed"
         case ProvisioningError.invalidData: return "provisioning.invalidData"
         case PayloadError.unresolvedPlaceholder: return "payload.unresolvedPlaceholder"
-        case PayloadError.emptyRegistration: return "payload.emptyRegistration"
         default: return "unmapped: \(error)"
         }
     }
