@@ -29,9 +29,9 @@ final class ExecutorProxy: CommandExecuting, @unchecked Sendable {
     }
 }
 
-// Runtime facade (spec §5.4.4): one CLU session per interface CLU, the 5 s
-// ping and 45 s re-registration loops, report routing into the shared
-// StateStore, and command routing by CLU id. It consumes a parsed
+// Runtime facade: one CLU session per interface CLU (each runs its own 5 s
+// ping and 45 s re-registration loops, spec §5.4.4), report routing into
+// the shared StateStore, and command routing by CLU id. It consumes a parsed
 // interface and does not care where it came from (Provisioning, file, QR).
 
 /// A connected Grenton installation: every device of the interface, kept
@@ -66,7 +66,6 @@ public actor GrentonSystem: CommandExecuting {
     private let responseTimeout: Duration
 
     private var sessions: [String: CluSession] = [:]
-    private var loopTasks: [Task<Void, Never>] = []
     private var reportTasks: [Task<Void, Never>] = []
     private var started = false
 
@@ -93,8 +92,8 @@ public actor GrentonSystem: CommandExecuting {
         interface: MobileInterfaceDTO,
         socketFactory: any UdpSocketFactory = NetworkUdpSocketFactory(),
         logger: GrentonLogger = .disabled,
-        pingInterval: Duration = .seconds(5),
-        registerInterval: Duration = .seconds(45),
+        pingInterval: Duration = CluSession.defaultPingInterval,
+        registerInterval: Duration = CluSession.defaultRegisterInterval,
         responseTimeout: Duration = .seconds(5)
     ) throws {
         self.clus = interface.clus.map(Clu.init(dto:))
@@ -166,7 +165,8 @@ public actor GrentonSystem: CommandExecuting {
         for clu in clus where sessions[clu.id] == nil {
             sessions[clu.id] = CluSession(
                 clu: clu, cipher: cipher, socketFactory: socketFactory,
-                logger: logger, responseTimeout: responseTimeout)
+                logger: logger, responseTimeout: responseTimeout,
+                pingInterval: pingInterval, registerInterval: registerInterval)
         }
 
         // Sessions in parallel: connect + initial ping, then subscribe to
@@ -188,17 +188,10 @@ public actor GrentonSystem: CommandExecuting {
         }
 
         await registerAll()
-
-        loopTasks.append(Task { [weak self] in
-            await self?.pingLoop()
-        })
-        loopTasks.append(Task { [weak self] in
-            await self?.registerLoop()
-        })
     }
 
-    // Serialized against start(); cancelled tasks are AWAITED so no zombie
-    // loop can outlive the call.
+    // Serialized against start(); cancelled report tasks are AWAITED so none
+    // can outlive the call. Sessions stop their own loops.
 
     /// Disconnects from every CLU.
     ///
@@ -210,8 +203,7 @@ public actor GrentonSystem: CommandExecuting {
         guard started else { return }
         started = false
 
-        let cancelled = loopTasks + reportTasks
-        loopTasks = []
+        let cancelled = reportTasks
         reportTasks = []
         for task in cancelled { task.cancel() }
         for task in cancelled { _ = await task.value }
@@ -259,8 +251,10 @@ public actor GrentonSystem: CommandExecuting {
         try await session.execute(action)
     }
 
-    // MARK: - Loops (spec §5.4.4)
+    // MARK: - Registration
 
+    /// Explicit registration; its slots update the store directly. Later
+    /// periodic re-registrations arrive through the report streams.
     private func registerAll() async {
         await withTaskGroup(of: Void.self) { group in
             for (cluId, session) in sessions {
@@ -271,32 +265,6 @@ public actor GrentonSystem: CommandExecuting {
                     store.updateKeys(keys, slots)   // initial values
                 }
             }
-        }
-    }
-
-    private func pingLoop() async {
-        while !Task.isCancelled {
-            do {
-                try await Task.sleep(for: pingInterval)
-            } catch { break }
-            guard started else { break }
-            await withTaskGroup(of: Void.self) { group in
-                for session in sessions.values {
-                    group.addTask { await session.ping() }
-                }
-            }
-        }
-    }
-
-    /// Renews subscription leases and fully resynchronises values
-    /// (self-healing after lost reports) — spec §5.4.4.
-    private func registerLoop() async {
-        while !Task.isCancelled {
-            do {
-                try await Task.sleep(for: registerInterval)
-            } catch { break }
-            guard started else { break }
-            await registerAll()
         }
     }
 }

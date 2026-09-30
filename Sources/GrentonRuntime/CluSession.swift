@@ -25,7 +25,10 @@ func sleepOn<C: Clock>(_ clock: C, for duration: C.Duration) async throws {
 // - `stop()` fails pending requests and cancels in-flight socket opens
 //   immediately (before taking the gate), so nothing drains slowly;
 // - recovery from `degraded` re-registers the last desired subscription
-//   set before the session becomes `ready` again (spec §5.4.5).
+//   set before the session becomes `ready` again (spec §5.4.5);
+// - the maintenance loops (spec §5.4.4) run on the injected clock: a ping
+//   every `pingInterval` after the previous loop ping ends, and a
+//   re-registration `registerInterval` after ANY registration ends.
 /// The connection to one CLU. `GrentonSystem` runs one per CLU; you rarely need it directly.
 public actor CluSession {
     public let clu: Clu
@@ -36,6 +39,8 @@ public actor CluSession {
     private let random: any RandomSource
     private let logger: GrentonLogger
     private let responseTimeout: Duration
+    private let pingInterval: Duration
+    private let registerInterval: Duration
     private let maxKeysPerRegister: Int
 
     /// Constant per session; every ping reuses it as its message id
@@ -43,6 +48,11 @@ public actor CluSession {
     private let keepAliveId: String
 
     public private(set) var state: SessionState = .idle
+
+    /// How long after the previous loop ping ends the next one is sent (spec §5.4.4).
+    public static let defaultPingInterval: Duration = .seconds(5)
+    /// How long after a registration ends the keys are registered again (spec §5.4.4).
+    public static let defaultRegisterInterval: Duration = .seconds(45)
 
     // MARK: Main socket
 
@@ -70,6 +80,13 @@ public actor CluSession {
     private var desiredKeys: [ValueRef] = []
     private var needsRecovery = false
 
+    // MARK: Maintenance loops (spec §5.4.4)
+
+    private var pingLoopTask: Task<Void, Never>?
+    /// Sleeps until the next re-registration; replaced whenever a
+    /// registration ends, so the interval counts from the latest one.
+    private var registerLoopTask: Task<Void, Never>?
+
     // MARK: Correlation & subscribers
 
     private var pending: [String: CheckedContinuation<WireResponse, any Error>] = [:]
@@ -92,6 +109,8 @@ public actor CluSession {
         random: any RandomSource = SystemRandomSource(),
         logger: GrentonLogger = .disabled,
         responseTimeout: Duration = .seconds(5),
+        pingInterval: Duration = CluSession.defaultPingInterval,
+        registerInterval: Duration = CluSession.defaultRegisterInterval,
         maxKeysPerRegister: Int = 30
     ) {
         self.clu = clu
@@ -101,6 +120,8 @@ public actor CluSession {
         self.random = random
         self.logger = logger
         self.responseTimeout = responseTimeout
+        self.pingInterval = pingInterval
+        self.registerInterval = registerInterval
         // At most 30 keys per request (spec §10 pt 4); at least one, or
         // chunking cannot advance.
         self.maxKeysPerRegister = min(max(maxKeysPerRegister, 1), 30)
@@ -109,15 +130,17 @@ public actor CluSession {
 
     // MARK: - Lifecycle (spec §5.4.5)
 
-    /// Idempotent. Opens the main socket and performs the initial ping.
-    /// Failure is not fatal: the session ends up `degraded` and every
-    /// subsequent `ping()` retries (including reopening the socket).
+    /// Idempotent. Opens the main socket, performs the initial ping and
+    /// starts the ping loop. Failure is not fatal: the session ends up
+    /// `degraded` and every later ping retries (including reopening the
+    /// socket).
     public func start() async {
         guard await beginOperation() else { return }
         defer { endOperation() }
         guard state == .idle || state == .stopped else { return }
         state = .starting
         _ = await pingInternal(gateHeld: true)
+        if state != .stopped { startPingLoop() }
     }
 
     /// Idempotent. After `stop()` the session may be started again
@@ -127,6 +150,10 @@ public actor CluSession {
         guard state != .stopped else { return }
         state = .stopped
         needsRecovery = !desiredKeys.isEmpty
+        pingLoopTask?.cancel()
+        pingLoopTask = nil
+        registerLoopTask?.cancel()
+        registerLoopTask = nil
 
         for (_, task) in activeOpens { task.cancel() }
         failAllPending(SessionError.connectionClosed)
@@ -200,6 +227,7 @@ public actor CluSession {
             defer { endOperation() }
             slots = await registerLocked(keys)
         }
+        scheduleReregistration()
         guard !slots.allSatisfy({ $0 == .failed }) else { return }
         // Partial failure keeps the flag — retried on the next ping.
         needsRecovery = slots.contains(.failed)
@@ -267,7 +295,52 @@ public actor CluSession {
         // the next successful ping must re-register (spec §5.4.5). A fully
         // clean registration clears the flag.
         needsRecovery = !keys.isEmpty && slots.contains(.failed)
+        scheduleReregistration()
         return slots
+    }
+
+    // MARK: - Maintenance loops (spec §5.4.4)
+
+    private func startPingLoop() {
+        pingLoopTask?.cancel()
+        pingLoopTask = Task { [weak self, clock, pingInterval] in
+            while true {
+                do { try await sleepOn(clock, for: pingInterval) } catch { return }
+                guard let self, !Task.isCancelled, await self.isRunning else { return }
+                // A lost ping is normal on UDP; the session degrades and
+                // this loop keeps retrying (spec §5.4.4, §5.4.5).
+                _ = await self.ping()
+            }
+        }
+    }
+
+    private var isRunning: Bool { state != .stopped }
+
+    /// Re-registers `registerInterval` after the latest registration ends,
+    /// while there are keys to renew.
+    private func scheduleReregistration() {
+        registerLoopTask?.cancel()
+        registerLoopTask = nil
+        guard state != .stopped, !desiredKeys.isEmpty else { return }
+        registerLoopTask = Task { [weak self, clock, registerInterval] in
+            do { try await sleepOn(clock, for: registerInterval) } catch { return }
+            guard let self, !Task.isCancelled else { return }
+            await self.reregister()
+        }
+    }
+
+    /// Renews the lease and resynchronises every value; the values reach
+    /// consumers through the report path, like a recovery (spec §5.4.4).
+    private func reregister() async {
+        guard await beginOperation() else { return }
+        defer { endOperation() }
+        guard state != .stopped, !desiredKeys.isEmpty else { return }
+        let keys = desiredKeys
+        let slots = await registerLocked(keys)
+        needsRecovery = slots.contains(.failed)
+        scheduleReregistration()
+        guard !slots.allSatisfy({ $0 == .failed }) else { return }
+        publishReport(ChunkReport(keys: keys, slots: slots))
     }
 
     /// Body of `register` — requires the operation gate to be held.

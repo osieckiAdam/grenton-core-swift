@@ -33,7 +33,11 @@ final class SessionScenario: @unchecked Sendable {
         session = CluSession(
             clu: Clu(id: id, serialNumber: "0", name: id, ip: ip, port: port, connectionType: .localOnly),
             cipher: cipher, socketFactory: transport, clock: clock,
-            responseTimeout: .milliseconds(timeout))
+            responseTimeout: .milliseconds(timeout),
+            // An omitted interval is the port's default (conformance.md §4b).
+            pingInterval: input["pingIntervalMs"]?.intValue.map { .milliseconds($0) } ?? CluSession.defaultPingInterval,
+            registerInterval: input["registerIntervalMs"]?.intValue.map { .milliseconds($0) }
+                ?? CluSession.defaultRegisterInterval)
     }
 
     func run(_ steps: [JSON]) async -> JSON {
