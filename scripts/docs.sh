@@ -63,4 +63,21 @@ PY
 )
 echo "Documentation: http://localhost:$PORT/"
 echo "Press Ctrl-C to stop."
-python3 -m http.server "$PORT" --directory "$SITE" --bind 127.0.0.1
+# no-store: after a rebuild the browser must not show a cached older site.
+python3 - "$PORT" "$SITE" <<'PY'
+import functools, http.server, sys
+
+class NoCache(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
+port, root = int(sys.argv[1]), sys.argv[2]
+handler = functools.partial(NoCache, directory=root)
+with http.server.ThreadingHTTPServer(("127.0.0.1", port), handler) as server:
+    print(f"Serving {root} on http://127.0.0.1:{port}/")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+PY
