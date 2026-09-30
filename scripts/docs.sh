@@ -44,7 +44,23 @@ done
 
 [ "$1" = "build" ] && exit 0
 
-PORT=${PORT:-8000}
+# Take the first free port from $PORT (default 8000) on; an earlier run may
+# still be serving in another terminal.
+PORT=$(python3 - "${PORT:-8000}" <<'PY'
+import socket, sys
+start = int(sys.argv[1])
+for port in range(start, start + 20):
+    with socket.socket() as s:
+        try:
+            s.bind(("127.0.0.1", port))
+        except OSError:
+            continue
+        print(port)
+        break
+else:
+    sys.exit(f"no free port in {start}-{start + 19}")
+PY
+)
 echo "Documentation: http://localhost:$PORT/"
 echo "Press Ctrl-C to stop."
 python3 -m http.server "$PORT" --directory "$SITE" --bind 127.0.0.1
