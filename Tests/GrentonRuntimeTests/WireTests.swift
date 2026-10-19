@@ -20,8 +20,10 @@ import GrentonModel
             == "req::aabbccdd:checkAlive()")
     }
 
-    @Test func registerRequestMatchesGoldenVectorPlaintext() throws {
-        // Identical to the plaintext of AES golden vector #2 (spec §9.1).
+    @Test func registerRequestFrame() throws {
+        // (ip, port, session, keys) with 0,0 = the registering socket
+        // (spec §5.3.2). AES golden vector #2 (spec §9.1) still carries the
+        // old argument form; it is only a cipher fixture.
         let keys: [ValueRef] = [
             .variable(cluId: "c", name: "AnalogIn1"),
             .attribute(cluId: "c", objectName: "DOU8272", index: "0"),
@@ -29,7 +31,7 @@ import GrentonModel
         let frame = WireFrame.request(
             msgId: "0f3e9a11",
             payload: try Payloads.clientRegister(sessionId: 12345, keys: keys))
-        #expect(frame == "req::0f3e9a11:SYSTEM:clientRegister(0,12345,1,{\"AnalogIn1\",{DOU8272,0}})")
+        #expect(frame == "req::0f3e9a11:SYSTEM:clientRegister(0,0,12345,{\"AnalogIn1\",{DOU8272,0}})")
     }
 
     @Test func emptyRegistrationIsRejected() {

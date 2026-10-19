@@ -30,7 +30,7 @@ final class ExecutorProxy: CommandExecuting, @unchecked Sendable {
 }
 
 // Runtime facade: one CLU session per interface CLU (each runs its own 5 s
-// ping and 45 s re-registration loops, spec §5.4.4), report routing into
+// ping and 30 s re-registration loops, spec §5.4.4), report routing into
 // the shared StateStore, and command routing by CLU id. It consumes a parsed
 // interface and does not care where it came from (Provisioning, file, QR).
 

@@ -40,7 +40,7 @@ public enum RegistrationSlot: Sendable, Equatable {
     case value(GrentonValue)
 }
 
-/// Report delivered by a subscription socket: the chunk's keys paired
+/// Report delivered for one subscription chunk: the chunk's keys paired
 /// positionally with the reported values.
 public struct ChunkReport: Sendable, Equatable {
     public let keys: [ValueRef]

@@ -23,7 +23,8 @@ import GrentonTestSupport
                      port: 1234, connectionType: .localOnly),
             cipher: cipher,
             socketFactory: InMemoryUdpSocketFactory(fake: fake, openDelay: openDelay),
-            responseTimeout: timeout)
+            responseTimeout: timeout,
+            registerFrameLimit: 309)   // 30 of the `{OBJ,n}` keys per chunk
         return (fake, session)
     }
 
@@ -120,17 +121,88 @@ import GrentonTestSupport
         await session.stop()
     }
 
-    @Test func restartAfterStopRestoresSubscriptions() async throws {
+    @Test func restartAfterStopStartsWithoutSubscriptions() async throws {
         let (fake, session) = try makeFixture()
         await session.start()
         _ = await session.register(attributeKeys(2))
         #expect(await fake.registrations.count == 1)
 
         await session.stop()
-        // Restart: the retained desired set re-registers on the first ping.
+        #expect(await fake.destroyedNumbers == [1])
+        // Restart: the caller registers again (spec §5.4.5); nothing is
+        // restored on its own.
         await session.start()
         #expect(await session.state == .ready)
-        #expect(await fake.registrations.count == 2)
+        #expect(await fake.registrations.count == 1)
+        _ = await session.register(attributeKeys(2))
+        #expect(await fake.registrations.last?.sessionId == 1)   // numbering restarts
+        await session.stop()
+    }
+
+    @Test func startRacingStopWaitsForTheTeardown() async throws {
+        let (fake, session) = try makeFixture()
+        await session.start()
+        _ = await session.register(attributeKeys(35))
+        // stop() suspends while sending its destroys; a start() issued once
+        // stop() has begun must not ping the socket being torn down.
+        let stopping = Task { await session.stop() }
+        while await session.state != .stopped { await Task.yield() }
+        await session.start()
+        await stopping.value
+        #expect(await fake.destroyedNumbers == [1, 2])
+        #expect(await session.state == .ready)
+        #expect(await fake.openedSockets.count == 2)
+        #expect(await fake.openedSockets.first?.isClosed == true)
+        // The new run works on its new socket.
+        #expect(await session.ping())
+        await session.stop()
+    }
+
+    @Test func concurrentStopsJoinOneTeardown() async throws {
+        let (fake, session) = try makeFixture()
+        await session.start()
+        _ = await session.register(attributeKeys(3))
+        async let first: Void = session.stop()
+        async let second: Void = session.stop()
+        _ = await (first, second)
+        #expect(await fake.destroyedNumbers == [1])
+        #expect(await session.state == .stopped)
+        #expect(await fake.openedSockets.allSatisfy { $0.isClosed })
+    }
+
+    @Test func emptyRegistrationThenStopDestroysEachNumberOnce() async throws {
+        let (fake, session) = try makeFixture()
+        await session.start()
+        _ = await session.register(attributeKeys(35))
+        async let emptied = session.register([])
+        async let stopped: Void = session.stop()
+        _ = await (emptied, stopped)
+        // Whichever runs first, every number is destroyed exactly once
+        // while the socket is still open.
+        #expect(await fake.destroyedNumbers.sorted() == [1, 2])
+    }
+
+    @Test func aRegistrationQueuedBeforeStopIsForgotten() async throws {
+        let (fake, session) = try makeFixture(timeout: .milliseconds(300))
+        await session.start()
+        await fake.setSilenced { $0.hasPrefix("SYSTEM:clientRegister(") }
+        // A hangs on the silent CLU and holds the gate; B queues behind it.
+        let first = Task { await session.register(attributeKeys(2)) }
+        try await Task.sleep(for: .milliseconds(30))
+        let second = Task { await session.register(attributeKeys(3)) }
+        try await Task.sleep(for: .milliseconds(30))
+        await session.stop()
+        _ = await (first.value, second.value)
+        await fake.setSilenced { _ in false }
+
+        // After a restart and a failed-then-good ping, nothing is restored
+        // on its own: B never reaches the CLU.
+        await session.start()
+        await fake.setSilenced { $0 == "checkAlive()" }
+        _ = await session.ping()
+        await fake.setSilenced { _ in false }
+        _ = await session.ping()
+        #expect(await fake.receivedPayloads.filter { $0.hasPrefix("SYSTEM:clientRegister(0,0,1,{{OBJ,0},{OBJ,1},{OBJ,2}})") }.isEmpty)
         await session.stop()
     }
 
@@ -164,5 +236,96 @@ import GrentonTestSupport
             if change.newValue == store.value(for: key) && count >= 2 { break }
         }
         #expect(count >= 2)
+    }
+}
+
+/// A transport whose sends never finish until the socket is closed.
+private final class HangingSocket: UdpSocket, @unchecked Sendable {
+    let incoming: AsyncStream<Data>
+    private let incomingContinuation: AsyncStream<Data>.Continuation
+    private let lock = NSLock()
+    private var waiting: [CheckedContinuation<Void, any Error>] = []
+    private var closed = false
+    var isClosed: Bool { lock.withLock { closed } }
+
+    init() {
+        var continuation: AsyncStream<Data>.Continuation!
+        incoming = AsyncStream { continuation = $0 }
+        incomingContinuation = continuation
+    }
+
+    func send(_ datagram: Data) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            lock.lock()
+            if closed {
+                lock.unlock()
+                continuation.resume(throwing: TransportError.connectionFailed("closed"))
+            } else {
+                waiting.append(continuation)
+                lock.unlock()
+            }
+        }
+    }
+
+    func close() {
+        lock.lock()
+        closed = true
+        let stuck = waiting
+        waiting = []
+        lock.unlock()
+        stuck.forEach { $0.resume(throwing: TransportError.connectionFailed("closed")) }
+        incomingContinuation.finish()
+    }
+}
+
+private final class HangingSocketFactory: UdpSocketFactory, @unchecked Sendable {
+    private let lock = NSLock()
+    private var opened: [HangingSocket] = []
+    var sockets: [HangingSocket] { lock.withLock { opened } }
+
+    func open(host: String, port: Int) async throws -> any UdpSocket {
+        let socket = HangingSocket()
+        lock.withLock { opened.append(socket) }
+        return socket
+    }
+}
+
+@Suite struct CluSessionHangingTransportTests {
+    @Test func stopIsNotBlockedByASendThatNeverFinishes() async throws {
+        let cipher = try AesCbcCipher(keyBase64: "AAECAwQFBgcICQoLDA0ODw==", ivBase64: "EBESExQVFhcYGRobHB0eHw==")
+        let session = CluSession(
+            clu: Clu(id: "CLU_1", serialNumber: "1", name: "Test", ip: "10.0.0.1",
+                     port: 1234, connectionType: .localOnly),
+            cipher: cipher, socketFactory: HangingSocketFactory(),
+            responseTimeout: .milliseconds(100))
+        await session.start()   // the ping's send hangs → timeout → degraded
+        #expect(await session.state == .degraded)
+        let slots = await session.register([.attribute(cluId: "CLU_1", objectName: "OBJ", index: "0")])
+        #expect(slots == [.failed])
+
+        // Two sends are stuck in the transport; stop() may wait for them at
+        // most one response timeout, then closes the socket.
+        let started = ContinuousClock.now
+        await session.stop()
+        #expect(ContinuousClock.now - started < .seconds(2))
+        #expect(await session.state == .stopped)
+    }
+
+    @Test func aDestroyBehindAStuckSendDropsTheSocketInstead() async throws {
+        let cipher = try AesCbcCipher(keyBase64: "AAECAwQFBgcICQoLDA0ODw==", ivBase64: "EBESExQVFhcYGRobHB0eHw==")
+        let factory = HangingSocketFactory()
+        let session = CluSession(
+            clu: Clu(id: "CLU_1", serialNumber: "1", name: "Test", ip: "10.0.0.1",
+                     port: 1234, connectionType: .localOnly),
+            cipher: cipher, socketFactory: factory,
+            responseTimeout: .milliseconds(100))
+        await session.start()
+        _ = await session.register([.attribute(cluId: "CLU_1", objectName: "OBJ", index: "0")])
+        // Its registration send is still stuck: the destroy of number 1 could
+        // overtake it, so the session drops the socket rather than send it.
+        _ = await session.register([])
+        #expect(factory.sockets.first?.isClosed == true)
+        #expect(await session.state == .degraded)
+        await session.stop()
     }
 }

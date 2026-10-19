@@ -37,7 +37,7 @@ func usage(exitCode: Int32 = 2) -> Never {
     options:
       --port <n>                OM port (default 9998)
       --watch <seconds>         how long to stream changes (default 30; 0 = list only)
-      --any-source              single unconnected BSD socket per CLU socket
+      --any-source              one unconnected BSD socket per CLU (accepts any sender)
       --on <entity-id>          turn a switch or light ON after connecting (repeatable)
       --off <entity-id>         turn a switch or light OFF after connecting (repeatable)
       --set-temperature <entity-id>=<celsius>

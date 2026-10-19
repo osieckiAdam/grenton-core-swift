@@ -8,8 +8,9 @@ import GrentonModel
 /// Parsed *client report* payload — the shape shared by the registration
 /// response and the unsolicited notification (spec §5.3.2–5.3.3).
 public struct ClientReport: Equatable, Sendable {
-    /// Session id as sent by the CLU. Reliable in registration responses;
-    /// NOT reliable in notifications (spec §5.3.3) — routing uses the socket.
+    /// The subscription number (spec §5.3.2): echoed in the registration
+    /// reply and in every notification, which the session routes by it
+    /// (spec §5.4.3).
     public let sessionId: Int
     public let values: [GrentonValue]
 }
@@ -27,13 +28,50 @@ public enum Payloads {
     /// Keep-alive ping (spec §5.3.1).
     public static let checkAlive = "checkAlive()"
 
-    /// `SYSTEM:clientRegister(0,{sessionId},1,{K1,...,Kn})` (spec §5.3.2).
-    /// The leading `0` and the `1` are fixed protocol constants. Key
-    /// rendering is owned by `ValueRef.wireSubscriptionKey`.
+    /// `SYSTEM:clientRegister(0,0,{session},{K1,...,Kn})` (spec §5.3.2): the
+    /// arguments are `(ip, port, session, keys)`, and `0,0` sends the
+    /// notifications to the registering socket. Key rendering is owned by
+    /// `ValueRef.wireSubscriptionKey`.
     public static func clientRegister(sessionId: Int, keys: [ValueRef]) throws -> String {
         guard !keys.isEmpty else { throw PayloadError.emptyRegistration }
         let rendered = keys.map(\.wireSubscriptionKey).joined(separator: ",")
-        return "SYSTEM:clientRegister(0,\(sessionId),1,{\(rendered)})"
+        return "SYSTEM:clientRegister(0,0,\(sessionId),{\(rendered)})"
+    }
+
+    /// `SYSTEM:clientDestroy(0,0,{session})` (spec §5.3.2): ends the
+    /// subscription with that number.
+    public static func clientDestroy(sessionId: Int) -> String {
+        "SYSTEM:clientDestroy(0,0,\(sessionId))"
+    }
+
+    /// The default limit of a registration frame in UTF-8 bytes (spec
+    /// §5.3.2): the datagram is then at most 1472 B, one IP packet at MTU 1500.
+    public static let defaultRegisterFrameLimit = 1471
+
+    /// Splits `keys`, in order, into chunks: each is the longest run whose
+    /// registration frame, with the number counted as six digits, fits
+    /// `limit` bytes; a key larger than the limit alone is a chunk of its
+    /// own (spec §5.4.2 pt 1).
+    public static func registrationChunks(_ keys: [ValueRef], frameLimit limit: Int) -> [[ValueRef]] {
+        // "req::" + 8-char msg_id + ":" + "SYSTEM:clientRegister(0,0,999999,{" … "})"
+        let overhead = "req::00000000:SYSTEM:clientRegister(0,0,999999,{})".utf8.count
+        var chunks: [[ValueRef]] = []
+        var current: [ValueRef] = []
+        var size = overhead
+        for key in keys {
+            let keySize = key.wireSubscriptionKey.utf8.count
+            let grown = size + keySize + (current.isEmpty ? 0 : 1)   // "," between keys
+            if !current.isEmpty && grown > limit {
+                chunks.append(current)
+                current = [key]
+                size = overhead + keySize
+            } else {
+                current.append(key)
+                size = grown
+            }
+        }
+        if !current.isEmpty { chunks.append(current) }
+        return chunks
     }
 
     /// Action payloads (spec §5.3.4). Values are interpolated verbatim —

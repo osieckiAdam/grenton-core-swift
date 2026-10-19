@@ -5,8 +5,8 @@ import GrentonTestSupport
 @testable import GrentonRuntime
 
 /// CluSession against the in-memory FakeClu (spec §9.4): keep-alive,
-/// chunked registration, per-socket report routing, actions, timeouts,
-/// and lifecycle.
+/// chunked registration under subscription numbers on the main socket,
+/// report routing by number, actions, timeouts, and lifecycle.
 @Suite struct CluSessionTests {
 
     static let keyB64 = "AAECAwQFBgcICQoLDA0ODw=="
@@ -17,7 +17,9 @@ import GrentonTestSupport
         cipher: AesCbcCipher,
         timeout: Duration = .seconds(2),
         failOpens: Bool = false,
-        maxKeysPerRegister: Int = 30
+        // 309 B fits exactly 30 of the `{OBJ,n}` keys below, as in the
+        // conformance scenarios.
+        registerFrameLimit: Int = 309
     ) -> CluSession {
         CluSession(
             clu: Clu(id: "CLU_1", serialNumber: "1", name: "Test", ip: "10.0.0.1",
@@ -25,7 +27,7 @@ import GrentonTestSupport
             cipher: cipher,
             socketFactory: InMemoryUdpSocketFactory(fake: fake, failOpens: failOpens),
             responseTimeout: timeout,
-            maxKeysPerRegister: maxKeysPerRegister)
+            registerFrameLimit: registerFrameLimit)
     }
 
     func makeFixture(timeout: Duration = .seconds(2)) throws -> (FakeClu, CluSession) {
@@ -83,7 +85,7 @@ import GrentonTestSupport
 
     // MARK: - Registration & chunking (spec §5.4.2)
 
-    @Test func registersInChunksOfThirtyOnDistinctSockets() async throws {
+    @Test func registersChunksAsNumberedSubscriptionsOnTheMainSocket() async throws {
         let (fake, session) = try makeFixture()
         await session.start()
 
@@ -92,15 +94,15 @@ import GrentonTestSupport
 
         #expect(slots.count == 65)
         let registrations = await fake.registrations
-        #expect(registrations.map(\.keyCount).sorted() == [5, 30, 30])
-        // One dedicated socket per chunk, all distinct (spec §5.3.3 rationale).
+        // 309 B takes 30 keys while indexes have one or two digits, then
+        // only 28 of the two-digit ones: the split counts bytes.
+        #expect(registrations.map(\.keyCount) == [30, 28, 7])
+        // Every chunk from the one socket, under its own number (spec §5.4.2).
         let sockets = registrations.map { ObjectIdentifier($0.socket) }
-        #expect(Set(sockets).count == 3)
-        // sid 0 — the only value live CLUs push to (spec §5.3.2).
-        for registration in registrations {
-            #expect(registration.sessionId == 0)
-            #expect(registration.payload.hasPrefix("SYSTEM:clientRegister(0,0,1,{"))
-        }
+        #expect(Set(sockets).count == 1)
+        #expect(await fake.openedSockets.count == 1)
+        #expect(registrations.map(\.sessionId) == [1, 2, 3])
+        #expect(registrations.map { $0.payload.hasPrefix("SYSTEM:clientRegister(0,0,\($0.sessionId),{") } == [true, true, true])
         await session.stop()
     }
 
@@ -145,20 +147,30 @@ import GrentonTestSupport
         await session.stop()
     }
 
-    @Test(arguments: [(0, 1), (31, 30), (-5, 1), (10, 10)])
-    func chunkSizeIsClampedToTheProtocolLimit(requested: Int, effective: Int) async throws {
+    // The limit may be lowered, never raised past 1471 B (spec §5.4.2 pt 1):
+    // 0 and -5 clamp to 1 B, so every key is a chunk of its own; 5000 clamps
+    // to 1471 B, which takes all 35 short keys at once.
+    @Test(arguments: [(0, 1), (-5, 1), (5000, 35), (309, 30)])
+    func frameLimitIsClampedToTheDefault(requested: Int, firstChunk: Int) async throws {
         let cipher = try AesCbcCipher(keyBase64: Self.keyB64, ivBase64: Self.ivB64)
         let fake = FakeClu(cipher: cipher)
-        let session = makeSession(fake: fake, cipher: cipher, maxKeysPerRegister: requested)
+        let session = makeSession(fake: fake, cipher: cipher, registerFrameLimit: requested)
         await session.start()
         _ = await session.register(attributeKeys(35))
-        let sizes = await fake.receivedPayloads
-            .filter { $0.hasPrefix("SYSTEM:clientRegister(") }
-            .map { FakeClu.parseRegistration($0).keyCount }
-        #expect(sizes.allSatisfy { $0 <= effective })
+        let sizes = await fake.registrations.map(\.keyCount)
         #expect(sizes.reduce(0, +) == 35)
-        #expect(sizes.first == effective)
+        #expect(sizes.first == firstChunk)
         await session.stop()
+    }
+
+    @Test func chunksAreSplitByFrameBytesNotKeyCount() {
+        // 30 long variable names exceed the default 1471 B; 30 short keys do not.
+        let long = (0..<30).map { ValueRef.variable(cluId: "CLU_1", name: "VERY_LONG_VARIABLE_NAME_\($0)_" + String(repeating: "X", count: 30)) }
+        #expect(Payloads.registrationChunks(long, frameLimit: Payloads.defaultRegisterFrameLimit).count == 2)
+        #expect(Payloads.registrationChunks(attributeKeys(30), frameLimit: Payloads.defaultRegisterFrameLimit).count == 1)
+        // A key larger than the limit is a chunk of its own.
+        let huge = ValueRef.variable(cluId: "CLU_1", name: String(repeating: "Y", count: 2000))
+        #expect(Payloads.registrationChunks([huge] + attributeKeys(2), frameLimit: 1471).map(\.count) == [1, 2])
     }
 
     @Test func failedChunkYieldsFailedSlotsPositionally() async throws {
@@ -177,17 +189,36 @@ import GrentonTestSupport
         await session.stop()
     }
 
-    @Test func reRegistrationClosesOldSockets() async throws {
+    @Test func reRegistrationReusesTheSocketAndNumber() async throws {
         let (fake, session) = try makeFixture()
         await session.start()
         _ = await session.register(attributeKeys(5))
-        let firstSocket = try #require(await fake.registrations.first?.socket)
-        #expect(!firstSocket.isClosed)
-
         _ = await session.register(attributeKeys(5))
-        #expect(firstSocket.isClosed)
-        #expect(await fake.registrations.count == 2)
+        let registrations = await fake.registrations
+        #expect(registrations.count == 2)
+        #expect(registrations.map(\.sessionId) == [1, 1])
+        #expect(registrations[0].socket === registrations[1].socket)
+        #expect(!registrations[0].socket.isClosed)
+        #expect(await fake.destroyedNumbers.isEmpty)
         await session.stop()
+    }
+
+    @Test func aChangedListGetsANewNumberAndTheOldOneIsDestroyed() async throws {
+        let (fake, session) = try makeFixture()
+        await session.start()
+        _ = await session.register(attributeKeys(5))
+        _ = await session.register(attributeKeys(4))
+        #expect(await fake.registrations.map(\.sessionId) == [1, 2])
+        #expect(await fake.destroyedNumbers == [1])
+        await session.stop()
+    }
+
+    @Test func stopDestroysEverySubscription() async throws {
+        let (fake, session) = try makeFixture()
+        await session.start()
+        _ = await session.register(attributeKeys(35))
+        await session.stop()
+        #expect(await fake.destroyedNumbers == [1, 2])
     }
 
     @Test func emptyRegistrationSendsNothing() async throws {
@@ -211,8 +242,8 @@ import GrentonTestSupport
         let stream = await session.reports()
         var iterator = stream.makeAsyncIterator()
 
-        // Report to the SECOND registration's socket; its chunk owns the
-        // 5-key tail (registration order can differ, so look it up).
+        // Report with the SECOND registration's number; its chunk owns the
+        // 5-key tail.
         let registrations = await fake.registrations
         let smallIndex = try #require(registrations.firstIndex { $0.keyCount == 5 })
         await fake.sendReport(
@@ -229,30 +260,31 @@ import GrentonTestSupport
         await session.stop()
     }
 
-    @Test func reportSidIsIgnoredForRegistrationAndRouting() async throws {
-        // Live CLUs answer and push `clientReport:1:` although every chunk
-        // registered sid 0 — routing must rely on the socket alone.
+    @Test func theNumberInARegistrationReplyIsNotChecked() async throws {
+        // Correlated by msg_id (spec §5.3.2 pt 1).
         let (fake, session) = try makeFixture()
-        await fake.setReplySessionId(1)
+        await fake.setReplySessionId(99)
+        await session.start()
+        let slots = await session.register(attributeKeys(35))
+        #expect(slots.allSatisfy { $0 != .failed })
+        await session.stop()
+    }
+
+    @Test func reportsAreRoutedByNumberAndUnknownOnesDropped() async throws {
+        let (fake, session) = try makeFixture()
         await session.start()
         let keys = attributeKeys(35)
-        let slots = await session.register(keys)
-        #expect(slots.allSatisfy { $0 != .failed })
+        _ = await session.register(keys)
 
         let stream = await session.reports()
         var iterator = stream.makeAsyncIterator()
-        let registrations = await fake.registrations
-        let bigIndex = try #require(registrations.firstIndex { $0.keyCount == 30 })
-        let smallIndex = try #require(registrations.firstIndex { $0.keyCount == 5 })
-
-        await fake.sendReport(registrationIndex: smallIndex, values: ["1", "2", "3", "4", "5"], sessionId: 1)
-        let small = try #require(await iterator.next())
-        #expect(small.keys == Array(keys[30..<35]))
-
-        await fake.sendReport(
-            registrationIndex: bigIndex, values: (0..<30).map(String.init), sessionId: 1)
-        let big = try #require(await iterator.next())
-        #expect(big.keys == Array(keys[0..<30]))
+        // An unknown number, then a known number with the wrong count: both dropped.
+        await fake.sendReport(registrationIndex: 0, values: ["1"], sessionId: 7)
+        await fake.sendReport(registrationIndex: 0, values: ["1", "2"], sessionId: 2)
+        // Number 1 owns the first 30 keys whatever socket the report used.
+        await fake.sendReport(registrationIndex: 1, values: (0..<30).map(String.init), sessionId: 1)
+        let report = try #require(await iterator.next())
+        #expect(report.keys == Array(keys[0..<30]))
         await session.stop()
     }
 

@@ -192,7 +192,7 @@ protocol UdpSocketFactory: Sendable {
 
 Implementacja produkcyjna — **dwa tryby za tym samym protokołem `UdpSocket`**:
 
-- **Domyślny:** `NWConnection(host:port:using: .udp)` — connected-UDP binduje port efemeryczny per połączenie (**socket-per-chunk wychodzi naturalnie**) i filtruje nadawcę do peera (spec Δ §7.1).
+- **Domyślny:** `NWConnection(host:port:using: .udp)` — connected-UDP binduje port efemeryczny per połączenie i filtruje nadawcę do peera (spec Δ §7.1). Sesja ma jeden taki socket: notyfikacje wracają na port źródłowy rejestracji, czyli na niego (spec §5.3.2).
 - **Fallback (pełnoprawny, testowany):** `AnySourceUdpSocketFactory` — **jeden niepodłączony socket BSD** (bind na porcie efemerycznym, `sendto` do CLU, `recv` od dowolnego nadawcy przez `DispatchSourceRead`). Wymagany przez spec §7.1: CLU z wieloma interfejsami może raportować z innego adresu źródłowego, a connected-UDP takie datagramy odrzuci. **Dlaczego nie `NWListener` + `NWConnection` na wspólnym porcie:** przy `SO_REUSEPORT` kernel rozdziela datagramy z obcych źródeł między oba sockety **niedeterministycznie** — część trafia w socket połączony, który je odrzuca (zweryfikowane empirycznie: taka architektura gubiła datagramy w ~20% przebiegów). Jeden niepodłączony socket odbiera wszystko na swoim porcie i wysyła z tego samego portu (wymóg protokołu: raporty wracają na port źródłowy rejestracji). Wybór trybu konfigurowalny na poziomie `GrentonSystem`; suite transportowa testuje odbiór z obcego portu źródłowego na loopbacku.
 
 Wspólne dla obu trybów:
@@ -200,7 +200,7 @@ Wspólne dla obu trybów:
 - pętla `receiveMessage` rekurencyjna pompuje datagramy do sesji;
 - `stateUpdateHandler`: `.failed`/`.cancelled` kończy strumień (sesja tłumaczy to na `ConnectionClosed` dla pending).
 
-**Jeden odbiorca na socket.** `AsyncStream` ma semantykę jednego konsumenta — dlatego strumień `incoming` socketu czyta **wyłącznie jedna pompa (router) należąca do sesji**. Router deszyfruje, parsuje ramkę i rozdziela: `msg_id` znaleziony w `pending` → wznowienie kontynuacji; ramka `clientReport` na sockecie chunka → emisja raportu z kluczami chunka. Żadna operacja (w szczególności `register` czekający na odpowiedź) **nie czyta socketu bezpośrednio** — czeka na kontynuacji zarejestrowanej u routera. To eliminuje wyścig konkurujących konsumentów.
+**Jeden odbiorca na socket.** `AsyncStream` ma semantykę jednego konsumenta — dlatego strumień `incoming` socketu czyta **wyłącznie jedna pompa (router) należąca do sesji**. Router deszyfruje, parsuje ramkę i rozdziela: `msg_id` znaleziony w `pending` → wznowienie kontynuacji; ramka `clientReport` → numer subskrypcji → emisja raportu z kluczami chunka o tym numerze (spec §5.4.3). Żadna operacja (w szczególności `register` czekający na odpowiedź) **nie czyta socketu bezpośrednio** — czeka na kontynuacji zarejestrowanej u routera. To eliminuje wyścig konkurujących konsumentów.
 
 ### 4.4 `CluSession` — aktor (spec §5.4)
 
@@ -224,10 +224,10 @@ public actor CluSession {
 Decyzje:
 
 - **Korelacja żądanie–odpowiedź:** `pending: [String: CheckedContinuation<String, Error>]` wewnątrz aktora; kontynuacje wznawia **router socketu** (§4.3), nigdy bezpośredni odczyt socketu przez operację. Timeout 5 s przez wyścig: task odpowiedzi vs `clock.sleep` w `withThrowingTaskGroup` — pierwszy wygrywa, drugi anulowany; wpis w `pending` sprzątany w `defer`. `any Clock<Duration>` wstrzyknięty → testy używają zegara manualnego i nie czekają realnych sekund.
-- **Reentrancja aktora.** Aktor Swifta jest reentrantny na `await` — sama izolacja **nie** serializuje operacji wieloetapowych (spec §5.4.5): dwie równoległe rejestracje mogłyby nawzajem zamykać sobie endpointy, `stop()` mógłby przeciąć `register` w pół. Sesja utrzymuje jawny `SessionState` (`idle/starting/ready/degraded/stopped` + `operationInProgress`) i **bramkę serializującą** dla `start`/`register`/`stop` (kolejka kontynuacji lub `AsyncSemaphore`); wywołanie w trakcie operacji czeka, `register` zgłoszony w czasie trwającego `register` jest łączony (coalescing do jednego przebiegu z najświeższym zbiorem kluczy). Przejścia stanów i retry w `degraded` (ponowne otwarcie socketu głównego przy tiku pingu) — dokładnie wg spec §5.4.5.
-- **Endpoint chunka:** struktura `{socket, keys, sessionId, routerTask}`; router emituje raporty z kluczami chunka domkniętymi w wartości (nie closure na `self` poza aktorem).
+- **Reentrancja aktora.** Aktor Swifta jest reentrantny na `await` — sama izolacja **nie** serializuje operacji wieloetapowych (spec §5.4.5): dwie równoległe rejestracje mogłyby pomieszać numery chunków, `stop()` mógłby przeciąć `register` w pół. Sesja utrzymuje jawny `SessionState` (`idle/starting/ready/degraded/stopped` + `operationInProgress`) i **bramkę serializującą** dla `start`/`register`/`stop` (kolejka kontynuacji lub `AsyncSemaphore`); wywołanie w trakcie operacji czeka, `register` zgłoszony w czasie trwającego `register` jest łączony (coalescing do jednego przebiegu z najświeższym zbiorem kluczy). Przejścia stanów i retry w `degraded` (ponowne otwarcie socketu głównego przy tiku pingu) — dokładnie wg spec §5.4.5.
+- **Chunk:** struktura `{number, keys}`; tabela `number → keys` obejmuje każdy numer, który CLU może jeszcze obsługiwać (od wysłania żądania do `clientDestroy`), i to po niej router kieruje raporty. Licznik numerów zerowany w `start()`, najwyżej 999999 (spec §5.4.2 pkt 1).
 - **`keepAliveId`** losowany w `init` z `RandomSource`; ping używa go jako `msgId` (spec §5.3.1).
-- **`register`** — implementuje pełną sekwencję spec §5.4.2 (zamknij stare endpointy → chunkuj po 30 → per chunk: nowy socket + `sessionId` = 0 (jedyna wartość, przy której CLU wysyła push — spec §5.3.2) + żądanie z tego socketu). Chunki równolegle przez `withTaskGroup`, wyniki składane pozycyjnie w `[RegistrationSlot]`.
+- **`register`** — implementuje sekwencję spec §5.4.2: podział po bajtach ramki (`Payloads.registrationChunks`, domyślnie 1471 B, `registerFrameLimit` może go obniżyć) → numeracja (chunk z identyczną listą zachowuje numer, inny dostaje nowy) → chunki **po kolei** z socketu głównego jako `clientRegister(0,0,{numer},…)` → `clientDestroy` numerów, których nowa lista nie używa. Wyniki składane pozycyjnie w `[RegistrationSlot]`. Re-rejestracja 30 s od wysłania pierwszego chunka poprzedniej rejestracji (`Clock.deadline(after:)`).
 
 ### 4.5 `StateStore` — klasa z blokadą, nie aktor (spec §5.5)
 
@@ -349,8 +349,8 @@ Zasady dostarczania błędów jak w spec §8: ścieżka odbioru połyka i loguje
 ## 8. Testy
 
 - **swift-testing**, fixtury w `Tests/Fixtures` przez `Bundle.module` — te same pliki co w repo spec (złote wektory AES §9.1 jako JSON, `data.json` §9.3, tabela castowania §9.2).
-- **FakeCLU**: `NWListener(using: .udp)` na `127.0.0.1:0` + ten sam `AesCbcCipher`; scenariusze ze spec §9.4. Listener odpowiada na port źródłowy datagramu — więc routing chunków testuje się realnie (rejestracje z dwóch socketów → raporty wracają na właściwe).
-- Testy czasowe (timeout 5 s, pętle 5/45 s) na wstrzykniętym zegarze testowym (`Clock` manualny) — zero realnego czekania.
+- **FakeCLU**: w pamięci (`InMemoryUdpSocket`) + ten sam `AesCbcCipher`; scenariusze ze spec §9.4. Odpowiada na socket nadawcy, notyfikacje niosą numer rejestracji, zapisuje `clientDestroy` — routing po numerze testuje się realnie.
+- Testy czasowe (timeout 5 s, pętle 5/30 s) na wstrzykniętym zegarze testowym (`Clock` manualny) — zero realnego czekania.
 - Checklist zgodności spec §9.5 jako osobny suite `ConformanceTests` — to jest definicja „port skończony".
 
 ## 9. Uwagi platformowe (iOS/macOS)
@@ -397,3 +397,12 @@ Każdy milestone kończy się zielonym testem; kolejność minimalizuje pracę �
 | ZIPFoundation jako jedyna zależność | izolowana w Provisioning; limity rozmiaru wg spec §4.3; w razie potrzeby wymienialna na ręczny parser ZIP (deflate przez `Compression.framework`) |
 | Prompt Local Network odrzucony przez użytkownika | stan `degraded` + dokumentacja dla aplikacji (nie da się wykryć wprost — tylko timeouty) |
 | Linux w przyszłości | `GrentonCipher` jako protokół — backend `_CryptoExtras` (AES.\_CBC) dodany jako conditional dependency z tymi samymi złotymi wektorami w CI; do tego czasu pakiet **deklaruje wyłącznie platformy Apple** w `Package.swift` |
+
+## 13. TODO
+
+Wnioski z przeglądu dwóch innych integracji Grentona z Home Assistant: `onesmarthome-ha` (MIT; forma mobilna, jak my) i `grenton-native` (GPL-3.0; forma Object Managera, klucz z pliku `.omp`). Z `grenton-native` bierzemy tylko fakty o protokole, nie kod.
+
+1. ✅ **Zrobione (spec 0.7.0):** argumenty to `(ip, port, sesja, klucze)`, zmierzone na 6 CLU trzech generacji firmware (`Examples/probe-register`). Notatka pierwotna: **Semantyka argumentów `clientRegister` (spec §5.3.2).** `grenton-native` używa formy OM `clientRegister("<ip klienta>",<port raportów>,<sesja>,{…})`. Hipoteza: nasze `(0,{sessionId},1,…)` to w rzeczywistości `(ip, port, sesja)`, gdzie `0,0` oznacza „odsyłaj na adres i port nadawcy”, a `1` to sesja (stąd zawsze `clientReport:1:`). Niezerowy „sessionId” byłby wtedy portem, na który CLU wysyła push. Do sprawdzenia na żywo: forma z jawnym IP i portem gniazda rejestracji, port różny od gniazda, różne wartości trzeciego argumentu na tym samym gnieździe. Wynik może przepisać §5.3.2, §5.3.3, §10.6 i założenie „socket per chunk”.
+2. ✅ **Zrobione (spec 0.7.0):** `clientDestroy(0,0,{numer})` przy `stop()` i dla numerów, których nowa lista nie używa. Notatka pierwotna: **`clientDestroy` przy `stop()` i przy zamykaniu endpointów przed re-rejestracją.** Forma OM to `SYSTEM:clientDestroy("<ip>",<port>,<sesja>)`; odpowiednik dla formy mobilnej do ustalenia razem z punktem 1. Spec first: nowa wiadomość w §5.3, scenariusze w zestawie `session`.
+3. **Porównanie mapowania z `onesmarthome-ha`.** Obsługujemy już wszystkie jego widgety (§6.3). Porównać semantykę tam, gdzie się różnimy: `ROLLER_SHUTTER_V3` (lamele, stop), `MULTISENSOR`, `SCENE_DOUBLE`, `*_DOUBLE`, format liczb w akcjach (oni: precyzja 0 → `"5"`, por. §10.3). Każdą rozbieżność rozstrzygnąć w specyfikacji albo zapisać jako Δ.
+4. **Import z pliku `.omp` w `GrentonProvisioning`.** Drugie źródło klucza i topologii: `properties.xml` → `projectCipherKey` (`keyBytes`/`ivBytes`), `system.xml` → CLU (`nameOnCLU`, `ipAddress`) oraz obiekty z cechami. Nie wymaga PIN-u ani otwartego OM, ale nie niesie widgetów myGrenton. Najpierw decyzja, jak takie obiekty mają się mapować na urządzenia kanoniczne (§6.6 obiekty fizyczne?).

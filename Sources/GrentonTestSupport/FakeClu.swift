@@ -67,7 +67,8 @@ public struct InMemoryUdpSocketFactory: UdpSocketFactory {
 
 /// Protocol simulator per spec §9.4: answers pings, registrations, and
 /// actions; can go silent per payload predicate; can emit unsolicited
-/// clientReport notifications to the socket a registration came from.
+/// clientReport notifications, carrying the registration's subscription
+/// number, to the socket a registration came from.
 public actor FakeClu {
     public struct Registration: Sendable {
         public let sessionId: Int
@@ -80,10 +81,12 @@ public actor FakeClu {
     public private(set) var receivedPayloads: [String] = []
     public private(set) var receivedMsgIds: [String] = []
     public private(set) var registrations: [Registration] = []
+    /// Subscription numbers of every `clientDestroy` received, in order.
+    public private(set) var destroyedNumbers: [Int] = []
     public private(set) var openedSockets: [InMemoryUdpSocket] = []
 
-    /// When set, register replies carry this sid instead of echoing the
-    /// request's — live CLUs answer `clientReport:1:` for a sid-0 request.
+    /// When set, register replies carry this number instead of echoing the
+    /// request's — the session must not check it (spec §5.3.2 pt 1).
     public var replySessionId: Int?
 
     public func setReplySessionId(_ sid: Int?) {
@@ -140,6 +143,10 @@ public actor FakeClu {
             let values = registrationValues(index, keyCount)
             respond("clientReport:\(replySessionId ?? sessionId):{\(values.joined(separator: ","))}",
                     msgId: msgId, to: socket)
+        } else if payload.hasPrefix("SYSTEM:clientDestroy(") {
+            let number = Int(payload.dropLast().split(separator: ",").last ?? "") ?? -1
+            destroyedNumbers.append(number)
+            respond("\(number)", msgId: msgId, to: socket)   // live CLUs answer the number
         } else {
             respond("ok", msgId: msgId, to: socket)
         }
@@ -153,11 +160,13 @@ public actor FakeClu {
     }
 
     /// Unsolicited clientReport (msg id 00000000) to the socket that sent
-    /// the given registration — the real CLU's behaviour (spec §5.3.3).
-    public func sendReport(registrationIndex: Int, values: [String], sessionId: Int = 0) {
+    /// the given registration, with its subscription number unless another
+    /// is given — the real CLU's behaviour (spec §5.3.3).
+    public func sendReport(registrationIndex: Int, values: [String], sessionId: Int? = nil) {
         guard registrations.indices.contains(registrationIndex) else { return }
         let registration = registrations[registrationIndex]
-        let frame = "resp:10.0.0.1:00000000:clientReport:\(sessionId):{\(values.joined(separator: ","))}"
+        let number = sessionId ?? registration.sessionId
+        let frame = "resp:10.0.0.1:00000000:clientReport:\(number):{\(values.joined(separator: ","))}"
         if let encrypted = try? cipher.encrypt(Data(frame.utf8)) {
             registration.socket.deliver(encrypted)
         }
@@ -168,10 +177,10 @@ public actor FakeClu {
         openedSockets.last?.deliver(Data([0xDE, 0xAD, 0xBE, 0xEF, 0x01]))
     }
 
-    /// `SYSTEM:clientRegister(0,{sid},1,{k1,...})` → (sid, top-level key count).
+    /// `SYSTEM:clientRegister(0,0,{session},{k1,...})` → (session, top-level key count).
     public static func parseRegistration(_ payload: String) -> (sessionId: Int, keyCount: Int) {
         let arguments = payload.dropFirst("SYSTEM:clientRegister(".count)
-        let sessionId = Int(arguments.split(separator: ",")[1]) ?? -1
+        let sessionId = Int(arguments.split(separator: ",")[2]) ?? -1
 
         guard let braceStart = arguments.firstIndex(of: "{"),
               let braceEnd = arguments.lastIndex(of: "}")

@@ -37,7 +37,9 @@ final class SessionScenario: @unchecked Sendable {
             // An omitted interval is the port's default (conformance.md §4b).
             pingInterval: input["pingIntervalMs"]?.intValue.map { .milliseconds($0) } ?? CluSession.defaultPingInterval,
             registerInterval: input["registerIntervalMs"]?.intValue.map { .milliseconds($0) }
-                ?? CluSession.defaultRegisterInterval)
+                ?? CluSession.defaultRegisterInterval,
+            // An omitted limit is the default frame limit (conformance.md §4b).
+            registerFrameLimit: input["registerFrameLimitBytes"]?.intValue ?? Payloads.defaultRegisterFrameLimit)
     }
 
     func run(_ steps: [JSON]) async -> JSON {

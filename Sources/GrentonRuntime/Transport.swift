@@ -11,6 +11,9 @@ public protocol UdpSocket: Sendable {
     /// unsolicited clientReports to the port a registration came from.
     var localPort: Int? { get }
     func send(_ datagram: Data) async throws
+    /// Closes the socket. Any `send` still in progress must then finish
+    /// (normally with an error): the session relies on it to unblock a
+    /// transport that stopped completing sends.
     func close()
 }
 
