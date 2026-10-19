@@ -26,6 +26,23 @@ let logger = GrentonLogger { level, message in
 let archive = try Data(contentsOf: URL(fileURLWithPath: arguments[1]))
 let system = try GrentonSystem(interface: ProvisioningClient.parseInterfaceArchive(archive), logger: logger)
 
+/// Ctrl+C disconnects first, so every CLU gets `clientDestroy` and stops
+/// pushing at once, instead of pushing to a closed port for up to a minute.
+func stopOnInterrupt(_ system: GrentonSystem) -> any DispatchSourceSignal {
+    signal(SIGINT, SIG_IGN)
+    let source = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
+    source.setEventHandler {
+        Task {
+            print("\ninterrupted, disconnecting…")
+            await system.stop()
+            exit(130)
+        }
+    }
+    source.resume()
+    return source
+}
+let interruptHandler = stopOnInterrupt(system)
+
 /// A one-line reading of an entity's current state; nil for entities
 /// without state (buttons, scenes, cameras).
 func state(of entity: BoundEntity) -> String? {
@@ -82,3 +99,4 @@ print("\nwatching for \(seconds) s…")
 try await Task.sleep(for: .seconds(seconds))
 watchers.forEach { $0.cancel() }
 await system.stop()
+interruptHandler.cancel()

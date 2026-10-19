@@ -201,6 +201,7 @@ do {
     if watchSeconds > 0 {
         print("\n→ connecting to CLUs (\(anySource ? "any-source" : "connected")), watching for \(watchSeconds)s …")
         let changes = system.store.changes()
+        let interruptHandler = stopOnInterrupt(system)
         await system.start()
         print("✓ sessions: \(await system.sessionStates())")
 
@@ -258,9 +259,26 @@ do {
         try await Task.sleep(for: .seconds(watchSeconds))
         watcher.cancel()
         await system.stop()
+        interruptHandler.cancel()
         print("✓ done")
     }
 } catch {
     FileHandle.standardError.write(Data("error: \(error)\n".utf8))
     exit(1)
+}
+
+/// Ctrl+C disconnects first, so every CLU gets `clientDestroy` and stops
+/// pushing at once, instead of pushing to a closed port for up to a minute.
+func stopOnInterrupt(_ system: GrentonSystem) -> any DispatchSourceSignal {
+    signal(SIGINT, SIG_IGN)
+    let source = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
+    source.setEventHandler {
+        Task {
+            print("\ninterrupted, disconnecting…")
+            await system.stop()
+            exit(130)
+        }
+    }
+    source.resume()
+    return source
 }
