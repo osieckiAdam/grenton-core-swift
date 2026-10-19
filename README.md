@@ -139,6 +139,7 @@ an app would. Each one is a single `main.swift` meant to be read.
 | [`watch-state`](Examples/watch-state/main.swift) | Every entity's normalized state after connecting, then changes as they happen | no |
 | [`switch-light`](Examples/switch-light/main.swift) | Turn a switch, dimmer or RGB light on/off and wait for the CLU to confirm | **yes** |
 | [`set-thermostat`](Examples/set-thermostat/main.swift) | Find a thermostat by its CLU object, read its state, set the target temperature and confirm the CLU applied it | **yes** |
+| [`probe-register`](Examples/probe-register/main.swift) | Research probe: registers a watched light and up to 29 other keys of one CLU in several `clientRegister` forms and counts where the pushes arrive (spec §5.3.2 hypothesis) | no |
 
 ```sh
 swift run set-thermostat dist/interface.zip THE1001 21

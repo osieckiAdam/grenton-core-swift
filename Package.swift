@@ -53,6 +53,11 @@ let package = Package(
             dependencies: ["GrentonProvisioning", "GrentonRuntime", "GrentonDevices"],
             path: "Examples/set-thermostat"
         ),
+        .executableTarget(
+            name: "probe-register",
+            dependencies: ["GrentonModel", "GrentonProvisioning", "GrentonRuntime", "GrentonDevices"],
+            path: "Examples/probe-register"
+        ),
         .target(
             name: "GrentonProvisioning",
             dependencies: [
