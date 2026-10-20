@@ -8,8 +8,12 @@ public enum ProvisioningError: Error, Sendable, Equatable {
     case authenticationFailed
     /// Object Manager could not be reached, or answered with an unexpected status.
     case connection(String)
-    /// The answer is not a valid interface archive.
+    /// The answer is not a valid interface archive, or the project file is malformed.
     case invalidData(String)
+    /// The project file has no interface with the requested id, or none at all.
+    case interfaceNotFound
+    /// The project file has several interfaces and none was chosen.
+    case interfaceAmbiguous
 }
 
 // Object Manager client (spec §4): one HTTP GET returns a ZIP whose

@@ -63,6 +63,10 @@ The saved file lets every next step run without a PIN. It contains the CLU
 encryption key, so it is written readable by you only and `dist/` is
 git-ignored.
 
+No PIN at hand? The project file you save in Object Manager (`.omp`) holds
+the same interface and key; `swift run import-project house.omp` reads it
+and lists the devices. The other examples take the downloaded archive.
+
 **2. List your devices.** This works offline, from the saved file alone.
 
 ```sh
@@ -135,6 +139,7 @@ an app would. Each one is a single `main.swift` meant to be read.
 | Example | What it shows | Changes your house? |
 |---|---|---|
 | [`fetch-interface`](Examples/fetch-interface/main.swift) | Download the interface from Object Manager with the PIN and save it | no |
+| [`import-project`](Examples/import-project/main.swift) | Read the interface from an Object Manager project file (`.omp`) instead of downloading it, and list the devices | no (offline) |
 | [`list-devices`](Examples/list-devices/main.swift) | Devices and entities per page, skipped widgets, objects shown by several widgets | no (offline) |
 | [`watch-state`](Examples/watch-state/main.swift) | Every entity's normalized state after connecting, then changes as they happen | no |
 | [`switch-light`](Examples/switch-light/main.swift) | Turn a switch, dimmer or RGB light on/off and wait for the CLU to confirm | **yes** |

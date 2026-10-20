@@ -12,6 +12,24 @@ public struct SkippedWidgetDiagnostic: Sendable {
     public let reason: String
 }
 
+// A `HEADER` widget (spec §3.5): layout only, no device. Kept so an app
+// can render the section titles between widgets.
+/// A section title between widgets on a page.
+public struct SectionHeaderDTO: Sendable {
+    /// The widget's stable identifier.
+    public let id: String
+    /// The title text.
+    public let label: String
+}
+
+/// One element of a page, in layout order.
+public enum PageItemDTO: Sendable {
+    /// A widget the library understands.
+    case widget(WidgetDTO)
+    /// A section title.
+    case header(SectionHeaderDTO)
+}
+
 // A page of the mobile interface. Widgets decode lossily (spec §3.6):
 // an element that fails — unknown `type`, missing field, unknown enum
 // value — is skipped and the rest of the page survives. Skips are
@@ -22,18 +40,42 @@ public struct PageDTO: Decodable, Sendable {
     public let name: String
     public let icon: String
     public let isFullscreenWidget: Bool
-    /// The widgets the library understands, in order.
-    public let widgets: [WidgetDTO]
+    /// Widgets and section headers in layout order.
+    public let items: [PageItemDTO]
     /// Widgets that could not be read.
     public let skippedWidgets: [SkippedWidgetDiagnostic]
+
+    /// The widgets the library understands, in order.
+    public var widgets: [WidgetDTO] {
+        items.compactMap { if case .widget(let w) = $0 { return w } else { return nil } }
+    }
 
     enum CodingKeys: String, CodingKey {
         case name, icon, isFullscreenWidget, widgets
     }
 
-    /// Reads only the `type` field while consuming the whole object element.
+    /// Reads `type`, `id` and a header's first label leniently while
+    /// consuming the whole object element.
     private struct TypeProbe: Decodable {
         let type: String?
+        let id: String?
+        let headerLabel: String?
+
+        private struct Component: Decodable {
+            let label: String?
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: AnyCodingKey.self)
+                label = try? c.decode(String.self, forKey: AnyCodingKey(stringValue: "label")!)
+            }
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: AnyCodingKey.self)
+            type = try? c.decode(String.self, forKey: AnyCodingKey(stringValue: "type")!)
+            id = try? c.decode(String.self, forKey: AnyCodingKey(stringValue: "id")!)
+            headerLabel = (try? c.decode([Component].self, forKey: AnyCodingKey(stringValue: "components")!))?
+                .first?.label
+        }
     }
 
     public init(from decoder: Decoder) throws {
@@ -43,16 +85,24 @@ public struct PageDTO: Decodable, Sendable {
         isFullscreenWidget = try c.decode(Bool.self, forKey: .isFullscreenWidget)
 
         var raw = try c.nestedUnkeyedContainer(forKey: .widgets)
-        var accepted: [WidgetDTO] = []
+        var accepted: [PageItemDTO] = []
         var skipped: [SkippedWidgetDiagnostic] = []
         while !raw.isAtEnd {
             do {
-                accepted.append(try raw.decode(WidgetDTO.self))
+                accepted.append(.widget(try raw.decode(WidgetDTO.self)))
             } catch {
                 let reason = String(describing: error)
                 if let probe = try? raw.decode(TypeProbe.self) {
-                    // Section headers are known layout, not a failure.
-                    if let type = probe.type, WidgetDTO.presentationalTypes.contains(type) { continue }
+                    if let type = probe.type, WidgetDTO.presentationalTypes.contains(type) {
+                        // A section header needs its id and first label
+                        // (spec §3.5); without them it is skipped like any widget.
+                        if let id = probe.id, let label = probe.headerLabel {
+                            accepted.append(.header(SectionHeaderDTO(id: id, label: label)))
+                        } else {
+                            skipped.append(SkippedWidgetDiagnostic(type: type, reason: "header without id or label"))
+                        }
+                        continue
+                    }
                     skipped.append(SkippedWidgetDiagnostic(type: probe.type, reason: reason))
                 } else if (try? raw.decode(JSONSkip.self)) != nil {
                     skipped.append(SkippedWidgetDiagnostic(type: nil, reason: reason))
@@ -62,7 +112,7 @@ public struct PageDTO: Decodable, Sendable {
                 }
             }
         }
-        widgets = accepted
+        items = accepted
         skippedWidgets = skipped
     }
 }

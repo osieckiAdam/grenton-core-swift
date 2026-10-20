@@ -44,6 +44,14 @@ try archive.write(to: URL(fileURLWithPath: "interface.zip"))
 The PIN may contain the space Object Manager shows. The archive holds the
 encryption key of your CLUs: store it privately, like a password.
 
+Without a PIN, read the interface from the project file saved in Object
+Manager (`.omp`) instead; it holds the same interface and the same key:
+
+```swift
+let project = try ProjectFile(data: Data(contentsOf: URL(fileURLWithPath: "house.omp")))
+let imported = try project.interface()
+```
+
 ### Start the system
 
 Later runs load the saved archive; no PIN and no Object Manager needed:

@@ -37,6 +37,7 @@ cd grenton-core-swift</code></pre>
 <pre><code>swift run fetch-interface 192.168.1.50 dist/interface.zip 149 853</code></pre>
     <p>Type the PIN as the dialog shows it, space included. If the port is not 9998, append it to the address: <code>192.168.1.50:9999</code>. The saved file lets every next step run without a PIN.</p>
     <div class="note warn">The file holds the encryption key of your CLUs. Keep it private, like a password; <code>dist/</code> is git-ignored.</div>
+    <p>Without a PIN, the project file saved in Object Manager (<code>.omp</code>) works too: <code>swift run import-project house.omp</code> reads the interface and lists the devices.</p>
 
     <h2><span class="step">4</span>List your devices</h2>
 <pre><code>swift run list-devices dist/interface.zip</code></pre>

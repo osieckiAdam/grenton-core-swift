@@ -90,6 +90,19 @@ enum Operations {
             guard let interface = try? MobileInterfaceDTO.decode(from: data) else { return reject }
             return .object(["outcome": .string("ok"), "value": MappingProjection.interface(interface)])
         },
+        "provisioning.omp": { input in
+            let data = try Data(contentsOf: ConformanceSuite.conformanceRoot
+                .appendingPathComponent(try input.string("fixture")))
+            let project = try ProjectFile(data: data)
+            let interface = try project.interface(id: input["interfaceId"]?.stringValue)
+            return ok([
+                "interfaces": .array(project.interfaces.map {
+                    .object(["id": .string($0.id), "name": .string($0.name)])
+                }),
+                "interface": ProjectProjection.root(interface),
+                "mapping": MappingProjection.interface(interface),
+            ])
+        },
         "number.format": { input in
             guard case .double(let value) = try untagged(input["value"]),
                   let precision = input["precision"]?.intValue else {
@@ -130,6 +143,8 @@ enum Operations {
         case ProvisioningError.connection: return "provisioning.connection"
         case ProvisioningError.authenticationFailed: return "provisioning.authenticationFailed"
         case ProvisioningError.invalidData: return "provisioning.invalidData"
+        case ProvisioningError.interfaceNotFound: return "provisioning.interfaceNotFound"
+        case ProvisioningError.interfaceAmbiguous: return "provisioning.interfaceAmbiguous"
         case PayloadError.unresolvedPlaceholder: return "payload.unresolvedPlaceholder"
         default: return "unmapped: \(error)"
         }
