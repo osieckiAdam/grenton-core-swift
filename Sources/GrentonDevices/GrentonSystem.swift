@@ -251,6 +251,34 @@ public actor GrentonSystem: CommandExecuting {
         try await session.execute(action)
     }
 
+    // MARK: - One-shot read
+
+    /// Reads the current values of `refs` once, without subscribing, and
+    /// stores them.
+    ///
+    /// Use it for values no entity watches, for a read-back after an action,
+    /// or for a screen shown only briefly. The result is in the order of
+    /// `refs`; a position is `failed` when its CLU did not answer or is not
+    /// part of this system. Values that were read update the store, so the
+    /// entities and change streams see them like any report.
+    public func fetch(_ refs: [ValueRef]) async -> [RegistrationSlot] {
+        var slots = [RegistrationSlot](repeating: .failed, count: refs.count)
+        let positions = Dictionary(grouping: refs.indices, by: { refs[$0].cluId })
+        await withTaskGroup(of: (String, [RegistrationSlot]).self) { group in
+            for (cluId, indices) in positions {
+                guard let session = sessions[cluId] else { continue }
+                let keys = indices.map { refs[$0] }
+                group.addTask { (cluId, await session.fetch(keys)) }
+            }
+            for await (cluId, read) in group {
+                guard let indices = positions[cluId] else { continue }
+                store.updateKeys(indices.map { refs[$0] }, read)
+                for (index, slot) in zip(indices, read) { slots[index] = slot }
+            }
+        }
+        return slots
+    }
+
     // MARK: - Registration
 
     /// Explicit registration; its slots update the store directly. Later

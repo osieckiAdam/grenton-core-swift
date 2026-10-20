@@ -31,6 +31,22 @@ for entity in system.entities {
 
 Buttons, scenes and cameras have no state, so their `updates()` is `nil`.
 
+### Read values once
+
+A subscription keeps values fresh for as long as the system runs. For a
+value nobody watches, or to read back right after an action, ask the CLU
+once; the answer also updates the store:
+
+```swift
+let refs = system.devices.flatMap { $0.descriptor.entities.flatMap(\.stateRefs) }
+let slots = await system.fetch(refs)
+for (ref, slot) in zip(refs, slots) {
+    if case .value(let value) = slot { print(ref, value) }
+}
+```
+
+A slot is `failed` when the CLU did not answer in time.
+
 ### When values are unknown
 
 A value is `nil` until its CLU reports it. If every value stays `nil`,

@@ -151,6 +151,43 @@ import GrentonModel
         #expect(report.values == [.string("a:b")])
     }
 
+    // Spec §5.3.2 pt 2: commas inside quotes and nested braces do not split.
+    @Test func commasInsideQuotesAndBracesDoNotSplit() throws {
+        let report = try #require(Payloads.parseClientReport(
+            "clientReport:1:{\"Salon, parter\",0,{1,2,3},{{4},6},\"\"}"))
+        #expect(report.values == [.string("Salon, parter"), .int(0), .string("{1,2,3}"), .string("{{4},6}"), .string("")])
+    }
+
+    @Test(arguments: [
+        "clientReport:1:{\"open,1}",     // unclosed string
+        "clientReport:1:{0,{1,2}",       // unclosed nested brace
+        "clientReport:1:{0,}{,1}",       // closing brace at depth 0
+    ])
+    func unbalancedContentIsRejected(_ payload: String) {
+        #expect(Payloads.parseClientReport(payload) == nil)
+    }
+
+    // MARK: - fetchValues (spec §5.3.2)
+
+    @Test func fetchValuesPayloadAndReply() throws {
+        let keys: [ValueRef] = [.variable(cluId: "C", name: "x_a"), .attribute(cluId: "C", objectName: "DOU1001", index: "0")]
+        #expect(try Payloads.fetchValues(keys: keys) == "SYSTEM:fetchValues({\"x_a\",{DOU1001,0}})")
+        #expect(throws: PayloadError.emptyRegistration) { try Payloads.fetchValues(keys: []) }
+        #expect(Payloads.parseValues("values:{1,nil,\"ON\",{2,3}}") == [.int(1), .null, .string("ON"), .string("{2,3}")])
+        #expect(Payloads.parseValues("values:{}") == [])
+        #expect(Payloads.parseValues("values:}") == nil)          // the CLU's reply to an empty list
+        #expect(Payloads.parseValues("clientReport:1:{1}") == nil)
+        #expect(Payloads.parseValues("values:{\"a}") == nil)
+    }
+
+    @Test func fetchChunksCountTheFetchFrame() {
+        let keys: [ValueRef] = [.variable(cluId: "C", name: "x_a"), .attribute(cluId: "C", objectName: "DOU1001", index: "0")]
+        // "req::00000000:SYSTEM:fetchValues({"x_a",{DOU1001,0}})" is 53 bytes; alone 41 and 47.
+        #expect(Payloads.fetchChunks(keys, frameLimit: 53).count == 1)
+        #expect(Payloads.fetchChunks(keys, frameLimit: 52).count == 2)
+        #expect(Payloads.registrationChunks(keys, frameLimit: 53).count == 2)   // the register frame is longer
+    }
+
     @Test(arguments: [
         ("clientReport:7:{}", 7, [GrentonValue]()),
         ("clientReport:7:{   }", 7, []),

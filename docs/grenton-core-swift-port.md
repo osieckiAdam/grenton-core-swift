@@ -176,6 +176,9 @@ enum Payloads {
     static func clientDestroy(sessionId: Int) -> String
     static func registrationChunks(_ keys: [ValueRef], frameLimit: Int) -> [[ValueRef]]   // podział po bajtach ramki (spec §5.4.2)
     static func parseClientReport(_ payload: String) -> ClientReport?                      // (sessionId, values)
+    static func fetchValues(keys: [ValueRef]) -> String                                    // SYSTEM:fetchValues({…}) (spec §5.3.2, od 0.9.0)
+    static func fetchChunks(_ keys: [ValueRef], frameLimit: Int) -> [[ValueRef]]
+    static func parseValues(_ payload: String) -> [GrentonValue]?                          // values:{…}; lista elementów dzielona poza cudzysłowami i nawiasami
 }
 ```
 

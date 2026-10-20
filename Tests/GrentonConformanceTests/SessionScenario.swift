@@ -187,6 +187,10 @@ final class SessionScenario: @unchecked Sendable {
             guard let keyList = step["keys"]?.arrayValue else { throw SuiteError("register needs keys") }
             let keys = try keyList.map(Self.valueRef)
             calls[name] = Task { .object(["slots": .array(await session.register(keys).map(Self.slot))]) }
+        case "fetch":
+            guard let keyList = step["keys"]?.arrayValue else { throw SuiteError("fetch needs keys") }
+            let keys = try keyList.map(Self.valueRef)
+            calls[name] = Task { .object(["slots": .array(await session.fetch(keys).map(Self.slot))]) }
         case "execute":
             guard let actionJSON = step["action"] else { throw SuiteError("execute needs an action") }
             let action = try ActionRef(dto: JSONDecoder().decode(ActionRefDTO.self, from: actionJSON.data()))

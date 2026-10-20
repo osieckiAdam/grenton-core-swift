@@ -414,6 +414,45 @@ public actor CluSession {
         return slots
     }
 
+    // MARK: - One-shot read (spec §5.4.2, `fetch`)
+
+    /// Reads the current values of `keys` once, without subscribing.
+    ///
+    /// Chunked and sent one chunk at a time like a registration; the slots
+    /// are in key order, `failed` where a chunk got no usable reply. It
+    /// leaves the subscriptions and the maintenance loops alone, sends
+    /// nothing without an open main socket, and `stop()` cuts it short with
+    /// `failed` for what was not read.
+    public func fetch(_ keys: [ValueRef]) async -> [RegistrationSlot] {
+        guard await beginOperation() else { return keys.map { _ in .failed } }
+        defer { endOperation() }
+        guard state != .stopped, mainSocket != nil else { return keys.map { _ in .failed } }
+        var results: [RegistrationSlot] = []
+        for chunk in Payloads.fetchChunks(keys, frameLimit: registerFrameLimit) {
+            results += await fetchChunk(chunk)
+        }
+        return results
+    }
+
+    private func fetchChunk(_ keys: [ValueRef]) async -> [RegistrationSlot] {
+        let failed = keys.map { _ in RegistrationSlot.failed }
+        guard state != .stopped, let socket = mainSocket else { return failed }
+        do {
+            let payload = try Payloads.fetchValues(keys: keys)
+            let response = try await sendRequest(payload, msgId: random.messageId(), over: socket)
+            guard let values = Payloads.parseValues(response.payload), values.count == keys.count else {
+                logger.error("[\(clu.name)] Malformed fetchValues response")
+                return failed
+            }
+            return values.map(RegistrationSlot.value)
+        } catch is CancellationError {
+            return failed
+        } catch {
+            logger.warning("[\(clu.name)] fetchValues failed: \(error)")
+            return failed
+        }
+    }
+
     // MARK: - Maintenance loops (spec §5.4.4)
 
     private func startPingLoop() {

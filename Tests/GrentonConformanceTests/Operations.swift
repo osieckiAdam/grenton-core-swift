@@ -62,6 +62,25 @@ enum Operations {
                   let action = try? ActionRef(dto: dto) else { return reject }
             return ok(["payload": .string(try Payloads.action(action))])
         },
+        "payload.fetch": { input in
+            guard let keys = input["keys"]?.arrayValue else { throw SuiteError("payload.fetch: bad input") }
+            let refs: [ValueRef] = try keys.map { key in
+                switch key["type"]?.stringValue {
+                case "variable":
+                    return .variable(cluId: "CLU", name: try key.string("name"))
+                case "attribute":
+                    return .attribute(cluId: "CLU", objectName: try key.string("objectName"),
+                                      index: try key.string("index"))
+                default:
+                    throw SuiteError("payload.fetch: unknown key type in \(key)")
+                }
+            }
+            return ok(["payload": .string(try Payloads.fetchValues(keys: refs))])
+        },
+        "payload.values": { input in
+            guard let values = Payloads.parseValues(try input.string("payload")) else { return reject }
+            return ok(["values": .array(values.map(tagged))])
+        },
         "payload.report": { input in
             guard let report = Payloads.parseClientReport(try input.string("payload")) else { return reject }
             return ok([
