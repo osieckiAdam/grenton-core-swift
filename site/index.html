@@ -70,6 +70,7 @@ await system.start()
 for light in system.entities.compactMap(\.switchable) {
     print(light.name, light.isOn == true ? "on" : "off")
 }</code></pre>
+        <p>No PIN at hand? A project file saved in Object Manager works too: <code>try ProjectFile(data: data).interface()</code> gives the same interface.</p>
         <p><a href="api/documentation/grentondevices/gettingstarted/">Using the library →</a></p>
       </div>
 
@@ -78,7 +79,8 @@ for light in system.entities.compactMap(\.switchable) {
 <pre><code>git clone https://github.com/osieckiAdam/grenton-core-swift.git
 cd grenton-core-swift
 swift run fetch-interface 192.168.1.50 dist/interface.zip 149 853
-swift run list-devices dist/interface.zip</code></pre>
+swift run list-devices dist/interface.zip
+swift run import-project house.omp            <span class="c"># the same, from a project file, no PIN</span></code></pre>
         <p><a href="getting-started/">The whole walkthrough →</a></p>
       </div>
 
