@@ -20,7 +20,8 @@ struct XmlDocument: Sendable {
     /// Parses `data`, rejecting a document with a `<!DOCTYPE>`, a syntax
     /// error, or two elements sharing an `id`.
     static func parse(_ data: Data) throws -> XmlDocument {
-        guard !hasDoctype(data) else { throw ProvisioningError.invalidData("XML with a DOCTYPE") }
+        guard let doctype = hasDoctype(data) else { throw ProvisioningError.invalidData("XML in an undecodable encoding") }
+        guard !doctype else { throw ProvisioningError.invalidData("XML with a DOCTYPE") }
         let builder = ArenaBuilder()
         let parser = XMLParser(data: data)
         parser.shouldProcessNamespaces = false
@@ -98,13 +99,14 @@ struct XmlDocument: Sendable {
 
     // MARK: DOCTYPE
 
-    /// Whether the prolog holds a document type declaration. The text is
-    /// decoded the way an XML parser chooses its encoding — byte-order
+    /// Whether the prolog holds a document type declaration; nil when the
+    /// document cannot be decoded at all (the caller rejects it). The text
+    /// is decoded the way an XML parser chooses its encoding — byte-order
     /// mark, the first bytes of the declaration, then its `encoding`
     /// attribute — so a UTF-16 document is read as such and not searched
     /// for ASCII bytes.
-    static func hasDoctype(_ data: Data) -> Bool {
-        guard let text = decodeForProlog(data) else { return false }   // undecodable: the parser reports it
+    static func hasDoctype(_ data: Data) -> Bool? {
+        guard let text = decodeForProlog(data) else { return nil }
         var rest = Substring(text)
         if rest.first == "\u{FEFF}" { rest = rest.dropFirst() }
         while true {
@@ -193,6 +195,32 @@ struct XmlDocument: Sendable {
 
         func parser(_ parser: XMLParser, parseErrorOccurred parseError: any Error) {
             failed = true
+        }
+
+        // Defence in depth behind the prolog check: a DTD the parser still
+        // reports (an entity, element, attribute or notation declaration)
+        // rejects the document too, whatever encoding it came in.
+        func parser(_ parser: XMLParser, foundInternalEntityDeclarationWithName name: String, value: String?) {
+            failed = true; parser.abortParsing()
+        }
+        func parser(_ parser: XMLParser, foundExternalEntityDeclarationWithName name: String,
+                    publicID: String?, systemID: String?) {
+            failed = true; parser.abortParsing()
+        }
+        func parser(_ parser: XMLParser, foundUnparsedEntityDeclarationWithName name: String,
+                    publicID: String?, systemID: String?, notationName: String?) {
+            failed = true; parser.abortParsing()
+        }
+        func parser(_ parser: XMLParser, foundElementDeclarationWithName elementName: String, model: String) {
+            failed = true; parser.abortParsing()
+        }
+        func parser(_ parser: XMLParser, foundAttributeDeclarationWithName attributeName: String,
+                    forElement elementName: String, type: String?, defaultValue: String?) {
+            failed = true; parser.abortParsing()
+        }
+        func parser(_ parser: XMLParser, foundNotationDeclarationWithName name: String,
+                    publicID: String?, systemID: String?) {
+            failed = true; parser.abortParsing()
         }
     }
 }
