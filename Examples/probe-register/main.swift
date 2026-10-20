@@ -42,6 +42,9 @@ var arguments = CommandLine.arguments
 }
 let selectedPhases = takeFlag("--phases").map { Set($0.uppercased().split(separator: ",").map(String.init)) }
 let extraSpec = takeFlag("--extra")
+// `--dimmer OBJ:IDX` names the dimmer feature phase K writes to (the only
+// phase that changes the house); it is restored at the end.
+let dimmerSpec = takeFlag("--dimmer")
 let scanMode = takeFlag("--scan", hasValue: false) != nil
 guard arguments.count >= 4 else {
     print("""
@@ -593,6 +596,76 @@ if await begin("I3", "lease with pings from the registration socket itself") {
     outcomes.append(Outcome(phase: "I3", question: "lives with pings from its own socket?", result: result))
     pingEvery5s(from: pinger)
     _ = await r.request("SYSTEM:clientDestroy(0,0,1)")
+    r.close()
+}
+
+// J — SYSTEM:fetchValues: a one-shot read the mobile app uses for its
+// schedule editors (static analysis of myGrenton 1.17.8). Read-only.
+if await begin("J", "fetchValues(\(keys.count) keys) from R, no registration") {
+    let r = try await openSocket("R")
+    let reply = await r.request("SYSTEM:fetchValues(\(renderedKeys))")
+    let parsed = reply.flatMap { Payloads.parseClientReport($0.payload) }
+    let shape = parsed.map { "clientReport:\($0.sessionId): with \($0.values.count) value(s) for \(keys.count) key(s)" }
+        ?? (reply.map { "reply is not a client report: \($0.payload.prefix(60))" } ?? "no reply")
+    outcomes.append(Outcome(phase: "J", question: "fetchValues answers? (expect values in key order)", result: shape))
+    if let parsed, let first = parsed.values.first { print("    watched value now: \(first)") }
+
+    let single = await r.request("SYSTEM:fetchValues({\(watched.wireSubscriptionKey)})")
+    outcomes.append(Outcome(phase: "J", question: "single key", result: single.map { $0.payload } ?? "no reply"))
+    let bogus = await r.request("SYSTEM:fetchValues({{NOPE_0000,0}})")
+    outcomes.append(Outcome(phase: "J", question: "unknown object", result: bogus.map { $0.payload } ?? "no reply"))
+    let empty = await r.request("SYSTEM:fetchValues({})")
+    outcomes.append(Outcome(phase: "J", question: "empty list", result: empty.map { $0.payload } ?? "no reply"))
+
+    await listen("J", seconds: phaseSeconds)
+    let pushes = await recorder.pushes(phase: "J")
+    outcomes.append(Outcome(phase: "J", question: "no subscription created? (expect no pushes)", result: countByLabel(pushes)))
+    let again = await r.request("SYSTEM:fetchValues({\(watched.wireSubscriptionKey)})")
+    outcomes.append(Outcome(phase: "J", question: "watched after toggles", result: again.map { $0.payload } ?? "no reply"))
+    r.close()
+}
+
+// K — do quotes around a numeric action value matter? The reference (and
+// the library) send execute(idx,"120.0"); the mobile app sends
+// execute(idx, 120.0). Writes to the dimmer named by --dimmer and restores it.
+if await begin("K", "action value forms on the dimmer") {
+    guard let dimmerSpec, let colon = dimmerSpec.firstIndex(of: ":") else {
+        print("    phase K needs --dimmer OBJ:IDX (the dimmer's value feature/method index)")
+        exit(2)
+    }
+    let object = String(dimmerSpec[..<colon])
+    let index = String(dimmerSpec[dimmerSpec.index(after: colon)...])
+    let r = try await openSocket("R")
+    func current() async -> String {
+        let reply = await r.request("SYSTEM:fetchValues({{\(object),\(index)}})", quiet: true)
+        return reply.map { $0.payload } ?? "no reply"
+    }
+    let before = await current()
+    print("    dimmer \(object):\(index) before: \(before)")
+    let forms: [(String, String)] = [
+        ("quoted float (reference form)", "execute(\(index),\"120.0\")"),
+        ("bare float, space (app form)", "execute(\(index), 60.0)"),
+        ("quoted integer", "execute(\(index),\"90\")"),
+        ("bare integer", "execute(\(index),150)"),
+        ("quoted fraction", "execute(\(index),\"33.33\")"),
+        ("bare fraction", "execute(\(index),66.66)"),
+        ("set() quoted", "set(\(index),\"45\")"),
+        ("set() bare", "set(\(index),75)"),
+    ]
+    for (title, call) in forms {
+        let reply = await r.request("\(object):\(call)")
+        try? await Task.sleep(for: .milliseconds(1500))
+        let after = await current()
+        outcomes.append(Outcome(phase: "K", question: "\(title): \(call)",
+                                result: "reply \(reply.map { $0.payload } ?? "none") → value \(after)"))
+    }
+    // Restore: reuse the value the CLU reported, in the reference form.
+    if let open = before.firstIndex(of: "{"), let close = before.lastIndex(of: "}"), open < close {
+        let original = String(before[before.index(after: open)..<close])
+        _ = await r.request("\(object):execute(\(index),\"\(original)\")")
+        try? await Task.sleep(for: .milliseconds(1500))
+        outcomes.append(Outcome(phase: "K", question: "restored to \(original)?", result: await current()))
+    }
     r.close()
 }
 
