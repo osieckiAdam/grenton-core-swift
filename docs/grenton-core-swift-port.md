@@ -173,7 +173,9 @@ enum Payloads {
     static func checkAlive() -> String
     static func clientRegister(sessionId: Int, keys: [ValueRef]) -> String
     static func action(_ a: ActionRef) -> String                     // 4 warianty (spec §5.3.4)
-    static func parseClientReport(_ payload: String) -> (sessionId: Int, values: [GrentonValue])?
+    static func clientDestroy(sessionId: Int) -> String
+    static func registrationChunks(_ keys: [ValueRef], frameLimit: Int) -> [[ValueRef]]   // podział po bajtach ramki (spec §5.4.2)
+    static func parseClientReport(_ payload: String) -> ClientReport?                      // (sessionId, values)
 }
 ```
 
@@ -331,6 +333,7 @@ public struct ProvisioningClient: Sendable {
 - `URLSession.data(from:)`; status 401 → `.authenticationFailed`, inne ≠200 → `.connection`; mapowanie błędów spec §4.2.
 - ZIP: `ZIPFoundation.Archive(data:accessMode:.read)` → wpis `mygrenton/data.json` → `JSONDecoder` → `MobileInterface`.
 - **Limity spec §4.3 egzekwowane jawnie:** rozmiar ciała odpowiedzi sprawdzany przed otwarciem archiwum, `uncompressedSize` wpisu przed ekstrakcją (10 MB każdy; przekroczenie → `.invalidData`); ścieżka wpisu porównywana dokładnie ze stałą, bez normalizacji.
+- **Import z pliku projektu (spec §4.5, od 0.8.0):** `ProjectFile(data:)` otwiera archiwum `.omp`, parsuje `properties.xml` i `system.xml` (własny DOM na `XMLParser`: arena węzłów w kolejności dokumentu, referencje `reference → id` rozwiązywane leniwie, `DOCTYPE` wykrywany po zdekodowaniu prologu w kodowaniu, które wybrałby parser; niedekodowalny dokument i każda deklaracja DTD → `.invalidData`) i listę interfejsów (`nodes/{n}/data.json` czytane własnym ścisłym parserem JSON — duplikaty kluczy, `NaN`, liczby poza Int64 i niekończone double → `.invalidData`). `interface(id:)` konwertuje interfejs regułami §4.5.6 do drzewa JSON, serializuje je i dekoduje jak pobrany `data.json`, więc dalej nic nie zależy od źródła. Limity (64 MiB na plik, wpis i sumę wpisów; 10 000 wpisów) są egzekwowane w trakcie dekompresji: strumień jest trzymany przy rozmiarze z nagłówka, a inny rozmiar końcowy odrzuca wpis. Nagłówki sekcji (`HEADER`) są od tej wersji zachowane w `PageDTO.items`, bo projekcja zgodności §4c wymienia je wśród widgetów, które przeszły parsowanie.
 - **Uwaga ATS (iOS):** OM mówi czystym HTTP. Aplikacja musi dodać wyjątek App Transport Security (`NSAllowsLocalNetworking = true` w `NSAppTransportSecurity`) — udokumentować w README pakietu; bez tego `URLSession` odrzuci połączenie.
 
 ## 7. Obsługa błędów

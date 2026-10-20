@@ -32,7 +32,7 @@ integration.
 |---|---|---|
 | `GrentonModel` | done | §3 |
 | `GrentonRuntime` | done (session, transports, state store) | §5 |
-| `GrentonProvisioning` | done | §4 |
+| `GrentonProvisioning` | done (Object Manager download, project-file import) | §4 |
 | `GrentonDevices` | done (descriptors, entities, physical objects, `GrentonSystem` facade) | §6 |
 | [`Examples/`](#examples) | small programs using the library | — |
 | [Documentation](#documentation) | DocC reference and guides | — |
@@ -144,7 +144,7 @@ an app would. Each one is a single `main.swift` meant to be read.
 | [`watch-state`](Examples/watch-state/main.swift) | Every entity's normalized state after connecting, then changes as they happen | no |
 | [`switch-light`](Examples/switch-light/main.swift) | Turn a switch, dimmer or RGB light on/off and wait for the CLU to confirm | **yes** |
 | [`set-thermostat`](Examples/set-thermostat/main.swift) | Find a thermostat by its CLU object, read its state, set the target temperature and confirm the CLU applied it | **yes** |
-| [`probe-register`](Examples/probe-register/main.swift) | Research probe: registers a watched light and up to 29 other keys of one CLU in several `clientRegister` forms and counts where the pushes arrive (spec §5.3.2 hypothesis) | no |
+| [`probe-register`](Examples/probe-register/main.swift) | Research probe behind spec §5.3.2 and §5.4.4: registers a watched object and up to 29 other keys of one CLU in several `clientRegister` forms, measures where the pushes go, how long a registration lives, the largest registration a CLU answers, `fetchValues`, and (phase K) which value forms an action accepts | only phase K, which writes a dimmer you name and restores it |
 
 ```sh
 swift run set-thermostat dist/interface.zip THE1001 21
