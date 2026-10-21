@@ -1,5 +1,11 @@
 // swift-tools-version: 6.0
+import Foundation
 import PackageDescription
+
+// The DocC plugin is needed only to build the documentation site
+// (scripts/docs.sh sets GRENTON_DOCS); apps depending on this package never
+// resolve or fetch it.
+let buildingDocumentation = ProcessInfo.processInfo.environment["GRENTON_DOCS"] != nil
 
 let package = Package(
     name: "GrentonCoreSwift",
@@ -15,9 +21,9 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.19"),
-        // Documentation only: `swift package generate-documentation`.
-        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.0"),
-    ],
+    ] + (buildingDocumentation
+        ? [.package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.0")]
+        : []),
     targets: [
         .target(name: "GrentonModel"),
         .target(name: "GrentonRuntime", dependencies: ["GrentonModel"]),

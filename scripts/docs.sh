@@ -21,7 +21,12 @@ mkdir -p "$SITE"
 cp -R site/. "$SITE/"
 cp docs/images/om-send-to-mobile.png "$SITE/assets/"
 
-swift package --allow-writing-to-directory "$SITE/api" generate-documentation \
+# The DocC plugin is a dependency only while GRENTON_DOCS is set
+# (Package.swift); SwiftPM then rewrites Package.resolved to include it, and
+# the committed file (without the plugin) is restored once the build is done.
+restore_resolved() { git checkout --quiet -- Package.resolved 2>/dev/null || true; }
+trap restore_resolved EXIT
+GRENTON_DOCS=1 swift package --allow-writing-to-directory "$SITE/api" generate-documentation \
     --target GrentonModel --target GrentonRuntime \
     --target GrentonProvisioning --target GrentonDevices \
     --enable-experimental-combined-documentation \

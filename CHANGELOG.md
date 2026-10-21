@@ -3,6 +3,11 @@
 Versions follow the specification the port implements; see README,
 "Versioning and stability".
 
+## Unreleased
+
+- The DocC plugin is no longer a dependency apps resolve: `Package.swift`
+  adds it only while `GRENTON_DOCS` is set, which `scripts/docs.sh` does.
+
 ## 0.9.1 — 2026-10-21
 
 First tagged release. Implements spec 0.9.1 and passes conformance suite
