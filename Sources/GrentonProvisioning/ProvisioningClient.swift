@@ -142,7 +142,7 @@ public struct ProvisioningClient: Sendable {
         } catch let error as URLError where error.code == .cancelled {
             throw CancellationError()
         } catch {
-            throw ProvisioningError.connection(String(describing: error))
+            throw ProvisioningError.connection(Self.describe(error, hiding: pin))
         }
 
         guard let http = response as? HTTPURLResponse else {
@@ -177,10 +177,29 @@ public struct ProvisioningClient: Sendable {
         } catch let error as URLError where error.code == .cancelled {
             throw CancellationError()
         } catch {
-            throw ProvisioningError.connection(String(describing: error))
+            throw ProvisioningError.connection(Self.describe(error, hiding: pin))
         }
 
         return body
+    }
+
+    /// A transport error as text that an app may log: a `URLError` is
+    /// reduced to its code and message, because its full description
+    /// carries the failing URL, which holds the PIN; the PIN is removed
+    /// from any other text as well.
+    static func describe(_ error: any Error, hiding pin: String) -> String {
+        var text: String
+        if let urlError = error as? URLError {
+            text = "URLError \(urlError.code.rawValue): \(urlError.localizedDescription)"
+        } else {
+            text = String(describing: error)
+        }
+        let compact = pin.filter { !$0.isWhitespace }
+        for secret in [pin, compact, compact.addingPercentEncoding(withAllowedCharacters: pinAllowed) ?? compact]
+        where !secret.isEmpty {
+            text = text.replacingOccurrences(of: secret, with: "***")
+        }
+        return text
     }
 
     // ZIP → `mygrenton/data.json` → `MobileInterfaceDTO` (spec §4.3).
@@ -214,24 +233,7 @@ public struct ProvisioningClient: Sendable {
         guard entry.type == .file else {
             throw ProvisioningError.invalidData("\(entryPath) is not a regular file")
         }
-        guard entry.uncompressedSize <= maxPayloadBytes else {
-            throw ProvisioningError.invalidData("data.json larger than \(maxPayloadBytes) bytes")
-        }
-
-        var json = Data()
-        do {
-            let checksum = try archive.extract(entry, bufferSize: 64 * 1024) { chunk in
-                json.append(chunk)
-            }
-            // The consumer overload computes but does not verify the CRC.
-            guard checksum == entry.checksum else {
-                throw ProvisioningError.invalidData("data.json checksum mismatch")
-            }
-        } catch let error as ProvisioningError {
-            throw error
-        } catch {
-            throw ProvisioningError.invalidData("ZIP extraction failed")
-        }
+        let json = try archive.extractBounded(entry, name: "data.json", limit: maxPayloadBytes)
 
         do {
             return try MobileInterfaceDTO.decode(from: json)

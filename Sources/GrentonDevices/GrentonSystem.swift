@@ -259,8 +259,11 @@ public actor GrentonSystem: CommandExecuting {
     /// Use it for values no entity watches, for a read-back after an action,
     /// or for a screen shown only briefly. The result is in the order of
     /// `refs`; a position is `failed` when its CLU did not answer or is not
-    /// part of this system. Values that were read update the store, so the
-    /// entities and change streams see them like any report.
+    /// part of this system. Values that were read are stored and announced
+    /// like a report — also for keys no entity watches, which stay readable
+    /// through ``store`` without becoming a subscription. A read that
+    /// arrives after a newer report of the same key can briefly show the
+    /// older value; the next report corrects it.
     public func fetch(_ refs: [ValueRef]) async -> [RegistrationSlot] {
         var slots = [RegistrationSlot](repeating: .failed, count: refs.count)
         let positions = Dictionary(grouping: refs.indices, by: { refs[$0].cluId })
@@ -272,7 +275,7 @@ public actor GrentonSystem: CommandExecuting {
             }
             for await (cluId, read) in group {
                 guard let indices = positions[cluId] else { continue }
-                store.updateKeys(indices.map { refs[$0] }, read)
+                store.updateKeys(indices.map { refs[$0] }, read, includingUnknown: true)
                 for (index, slot) in zip(indices, read) { slots[index] = slot }
             }
         }

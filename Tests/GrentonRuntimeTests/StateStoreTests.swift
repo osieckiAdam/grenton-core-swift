@@ -27,6 +27,20 @@ import GrentonModel
         #expect(store.value(for: keyA) == .null)                   // known nil (spec §5.5 Δ)
     }
 
+    @Test func unknownKeysAreStoredOnlyWhenAsked() async {
+        let store = StateStore()
+        store.registerKey(keyA)
+        var iterator = store.changes().makeAsyncIterator()
+        store.updateKeys([keyOther], [.value(.int(1))])
+        #expect(store.value(for: keyOther) == nil)
+        store.updateKeys([keyOther, keyA], [.value(.int(1)), .value(.int(2))], includingUnknown: true)
+        #expect(store.value(for: keyOther) == .int(1))
+        #expect(await iterator.next()?.key == keyOther)
+        #expect(await iterator.next()?.key == keyA)
+        // Still not a subscription.
+        #expect(store.subscriptionOrder(cluId: "CLU_2") == [])
+    }
+
     @Test func failedSlotsAreSkipped() {
         let store = StateStore()
         store.registerKey(keyA)

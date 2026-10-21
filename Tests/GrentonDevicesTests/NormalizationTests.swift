@@ -29,6 +29,19 @@ import GrentonModel
         #expect(formatDeviceNumber(value, precision: precision) == expected)
     }
 
+    // A number too wide for Int64 arrives as a double (spec §3.1 pt 4);
+    // `Int(_:)` would trap on it, and one bad datagram must not crash the app.
+    @Test func asIntNeverTraps() {
+        #expect(asInt(.double(1e20)) == nil)
+        #expect(asInt(.double(-1e300)) == nil)
+        #expect(asInt(.double(.infinity)) == nil)
+        #expect(asInt(.double(.nan)) == nil)
+        #expect(asInt(.double(42.9)) == 42)
+        #expect(asInt(.double(-42.9)) == -42)
+        #expect(asInt(.int(7)) == 7)
+        #expect(asInt(.string("7")) == nil)
+    }
+
     @Test func plainFormatDropsIntegerDecimal() {
         #expect(formatDeviceNumber(50.0, precision: 0, format: .plain) == "50")
         #expect(formatDeviceNumber(20.456, precision: 1, format: .plain) == "20.5")

@@ -61,8 +61,10 @@ public final class StateStore: @unchecked Sendable {
 
     /// Positional update. `.failed` slots are skipped; `.value` slots
     /// overwrite — including `.value(.null)` (spec §5.5 Δ). Keys that were
-    /// never registered are ignored, mirroring the reference.
-    public func updateKeys(_ keys: [ValueRef], _ slots: [RegistrationSlot]) {
+    /// never registered are ignored, mirroring the reference, unless
+    /// `includingUnknown` is set: a one-shot read (`fetch`, spec §5.4.2)
+    /// stores and announces them without making them a subscription.
+    public func updateKeys(_ keys: [ValueRef], _ slots: [RegistrationSlot], includingUnknown: Bool = false) {
         lock.lock()
         defer { lock.unlock() }
         // Yielding stays INSIDE the critical section: commit order and
@@ -71,7 +73,7 @@ public final class StateStore: @unchecked Sendable {
         // runs subscriber code synchronously, so this is deadlock-free.
         for (key, slot) in zip(keys, slots) {
             guard case .value(let newValue) = slot else { continue }
-            guard known.contains(key) else { continue }
+            guard includingUnknown || known.contains(key) else { continue }
             let oldValue = values[key]
             if oldValue != newValue {
                 values[key] = newValue

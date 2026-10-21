@@ -169,6 +169,39 @@ final class StubURLProtocol: URLProtocol {
         }
     }
 
+    @Test func transportErrorTextNeverCarriesThePin() async throws {
+        StubURLProtocol.reset()
+        StubURLProtocol.failWith = URLError(.cannotConnectToHost, userInfo: [
+            NSURLErrorFailingURLStringErrorKey: "http://192.168.1.5:9998/api/v1/interface/hash/149853",
+        ])
+        defer { StubURLProtocol.failWith = nil }
+        do {
+            _ = try await makeClient().fetchInterface(pin: "149 853")
+            Issue.record("expected throw")
+        } catch ProvisioningError.connection(let text) {
+            #expect(!text.contains("149853"))
+            #expect(!text.contains("149 853"))
+            #expect(text.hasPrefix("URLError -1004"))
+        }
+        #expect(!ProvisioningClient.describe(URLError(.timedOut), hiding: "12 34").contains("1234"))
+        #expect(ProvisioningClient.describe(TestError(text: "pin 1234 inside"), hiding: "1234") == "TestError(text: \"pin *** inside\")")
+    }
+
+    struct TestError: Error { let text: String }
+
+    @Test func extractionIsBoundedWhileItStreams() throws {
+        // A 200 kB entry against a 100 kB limit: rejected before the whole
+        // entry is inflated, and the archive-level limit stays the one place
+        // a lying header could get past.
+        let big = Data(repeating: UInt8(ascii: "x"), count: 200_000)
+        let archive = try Archive(data: try makeZip(content: big), accessMode: .read)
+        let entry = try #require(archive["mygrenton/data.json"])
+        #expect(throws: ProvisioningError.self) {
+            try archive.extractBounded(entry, name: "data.json", limit: 100_000)
+        }
+        #expect(try archive.extractBounded(entry, name: "data.json", limit: 200_000) == big)
+    }
+
     @Test func badZipBytesAreInvalidData() async throws {
         StubURLProtocol.reset()
         StubURLProtocol.response = (200, Data("definitely not a zip".utf8))

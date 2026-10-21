@@ -169,28 +169,6 @@ private struct ProjectArchive {
 
     func required(_ name: String) throws -> Data {
         guard let entry = entries[name] else { throw ProvisioningError.invalidData("missing \(name)") }
-        // The declared size was checked against the limit; the stream is
-        // held to the declared size while it decompresses, so a header that
-        // lies about its size cannot grow the buffer past it.
-        let declared = Int(entry.uncompressedSize)
-        var data = Data()
-        data.reserveCapacity(declared)
-        do {
-            let checksum = try archive.extract(entry, bufferSize: 64 * 1024) { chunk in
-                guard data.count + chunk.count <= declared else {
-                    throw ProvisioningError.invalidData("\(name): longer than its declared size")
-                }
-                data.append(chunk)
-            }
-            guard checksum == entry.checksum else { throw ProvisioningError.invalidData("\(name): checksum mismatch") }
-        } catch let error as ProvisioningError {
-            throw error
-        } catch {
-            throw ProvisioningError.invalidData("\(name): extraction failed")
-        }
-        guard data.count == declared else {
-            throw ProvisioningError.invalidData("\(name): shorter than its declared size")
-        }
-        return data
+        return try archive.extractBounded(entry, name: name, limit: ProjectFile.maxBytes)
     }
 }

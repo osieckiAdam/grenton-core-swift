@@ -4,7 +4,8 @@ import GrentonRuntime
 
 /// In-memory UDP socket pair: `send` delivers to the fake CLU, the fake
 /// delivers responses back via `deliver`. One instance = one ephemeral
-/// "port", so socket-per-chunk routing is exercised faithfully.
+/// "port"; the session uses one per CLU and routes notifications by
+/// subscription number (spec §5.4).
 public final class InMemoryUdpSocket: UdpSocket, @unchecked Sendable {
     public let incoming: AsyncStream<Data>
     private let continuation: AsyncStream<Data>.Continuation
@@ -99,6 +100,16 @@ public actor FakeClu {
     public var registrationValues: @Sendable (Int, Int) -> [String] = { registrationIndex, keyCount in
         (0..<keyCount).map { String($0) }
     }
+    /// Values returned for a `fetchValues` of N keys (spec §5.3.2): `values:{…}`.
+    public var fetchValues: @Sendable (Int) -> [String] = { keyCount in
+        (0..<keyCount).map { String($0 + 100) }
+    }
+    /// Every `fetchValues` payload received, in order.
+    public private(set) var fetches: [String] = []
+
+    public func setFetchValues(_ provider: @escaping @Sendable (Int) -> [String]) {
+        fetchValues = provider
+    }
 
     public init(cipher: AesCbcCipher) {
         self.cipher = cipher
@@ -143,6 +154,10 @@ public actor FakeClu {
             let values = registrationValues(index, keyCount)
             respond("clientReport:\(replySessionId ?? sessionId):{\(values.joined(separator: ","))}",
                     msgId: msgId, to: socket)
+        } else if payload.hasPrefix("SYSTEM:fetchValues(") {
+            fetches.append(payload)
+            let keyCount = Self.parseRegistration("SYSTEM:clientRegister(0,0,0," + payload.dropFirst("SYSTEM:fetchValues(".count)).keyCount
+            respond("values:{\(fetchValues(keyCount).joined(separator: ","))}", msgId: msgId, to: socket)
         } else if payload.hasPrefix("SYSTEM:clientDestroy(") {
             let number = Int(payload.dropLast().split(separator: ",").last ?? "") ?? -1
             destroyedNumbers.append(number)

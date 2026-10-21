@@ -92,6 +92,29 @@ import GrentonTestSupport
         await system.stop()
     }
 
+    @Test func fetchReadsOnceAndStoresEvenUnwatchedKeys() async throws {
+        let (system, fake) = try makeSystem()
+        await system.start()
+        defer { Task { await system.stop() } }
+        await fake.setFetchValues { count in (0..<count).map { _ in "\"ON\"" } }
+
+        let watched = ValueRef.attribute(cluId: "CLU_501234567", objectName: "DOU8272", index: "0")
+        let unwatched = ValueRef.attribute(cluId: "CLU_501234567", objectName: "NOPE_0000", index: "0")
+        let foreign = ValueRef.attribute(cluId: "CLU_UNKNOWN", objectName: "X", index: "0")
+        let slots = await system.fetch([unwatched, foreign, watched])
+
+        #expect(slots == [.value(.string("ON")), .failed, .value(.string("ON"))])
+        let fetches = await fake.fetches
+        #expect(fetches == ["SYSTEM:fetchValues({{NOPE_0000,0},{DOU8272,0}})"])
+        #expect(system.store.value(for: unwatched) == .string("ON"))
+        #expect(try toggle(in: system).isOn == true)
+        // A one-shot read registers nothing.
+        #expect(system.store.subscriptionOrder(cluId: "CLU_501234567").contains(unwatched) == false)
+        let registrations = await fake.registrations.count
+        #expect(registrations == 1)
+        await system.stop()
+    }
+
     @Test func unknownCluIsRejected() async throws {
         let (system, _) = try makeSystem()
         await system.start()

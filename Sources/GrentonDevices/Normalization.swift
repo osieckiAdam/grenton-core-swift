@@ -61,10 +61,14 @@ public func asDouble(_ value: GrentonValue?) -> Double? {
 }
 
 /// The value as an integer, if it is a number (decimals are truncated).
+///
+/// `nil` for a double outside the `Int` range or not finite: the wire can
+/// carry such a number (an integer wider than 64 bits arrives as a double,
+/// spec §3.1 pt 4), and it must not crash the app.
 public func asInt(_ value: GrentonValue?) -> Int? {
     switch value {
     case .int(let i): return Int(i)
-    case .double(let d): return Int(d)
+    case .double(let d): return d.isFinite ? Int(exactly: d.rounded(.towardZero)) : nil
     default: return nil
     }
 }
