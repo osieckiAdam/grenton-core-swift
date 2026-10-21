@@ -51,13 +51,15 @@ import GrentonTestSupport
     @Test func concurrentPingsShareOneMainSocket() async throws {
         let (fake, session) = try makeFixture(openDelay: .milliseconds(50))
 
-        // Both pings race the (delayed) main-socket open. Single-flight
-        // open must install exactly one socket; the shared keepAliveId
-        // guard keeps the second ping from racing the first request.
+        // Two explicit pings race start()'s (delayed) main-socket open.
+        // Single-flight open must install exactly one socket; the shared
+        // keepAliveId guard keeps the pings from racing the first request.
+        // (Before start() a ping sends nothing, spec §5.4.5.)
+        async let started: Void = session.start()
+        try await Task.sleep(for: .milliseconds(10))
         async let first = session.ping()
         async let second = session.ping()
-        let results = await (first, second)
-        #expect(results.0 || results.1)
+        _ = await (started, first, second)
 
         #expect(await fake.openedSockets.count == 1)
         // Session is healthy afterwards.

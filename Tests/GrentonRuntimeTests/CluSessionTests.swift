@@ -42,6 +42,34 @@ import GrentonTestSupport
 
     // MARK: - Lifecycle & ping
 
+    @Test func pingAndRegisterBeforeStartSendNothing() async throws {
+        let (fake, session) = try makeFixture()
+        #expect(await session.ping() == false)
+        #expect(await session.register(attributeKeys(2)) == [.failed, .failed])
+        #expect(await fake.receivedPayloads.isEmpty)
+        #expect(await fake.openedSockets.isEmpty)
+        #expect(await session.state == .idle)
+    }
+
+    @Test func droppingASessionWithoutStopClosesItsSocket() async throws {
+        let (fake, _) = try makeFixture()
+        weak var dropped: CluSession?
+        do {
+            let session = makeSession(fake: fake, cipher: try AesCbcCipher(keyBase64: Self.keyB64, ivBase64: Self.ivB64))
+            await session.start()
+            _ = await session.register(attributeKeys(2))
+            #expect(await session.state == .ready)
+            dropped = session
+        }
+        // The routers hold the session weakly, so letting go of it runs
+        // deinit, which closes the socket and ends the router loop.
+        for _ in 0..<50 where dropped != nil { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(dropped == nil)
+        #expect(await fake.openedSockets.last?.isClosed == true)
+        // No clientDestroy: only stop() sends it; the CLU's lease expires.
+        #expect(await fake.destroyedNumbers.isEmpty)
+    }
+
     @Test func startPingsAndBecomesReady() async throws {
         let (fake, session) = try makeFixture()
         await session.start()

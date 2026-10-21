@@ -1,5 +1,5 @@
 {
-  "suiteVersion": "0.9.0",
+  "suiteVersion": "0.9.1",
   "profiles": ["stateless", "mapping", "session", "project"],
   "skips": []
 }

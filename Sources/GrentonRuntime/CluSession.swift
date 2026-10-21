@@ -84,6 +84,11 @@ public actor CluSession {
 
     public private(set) var state: SessionState = .idle
 
+    /// Pings on the wire that timed out since the main socket opened or
+    /// the last reply; the third one retires the socket (spec §5.4.5).
+    private var consecutivePingTimeouts = 0
+    private static let pingTimeoutsBeforeReplacing = 3
+
     /// How long after the previous loop ping ends the next one is sent (spec §5.4.4).
     public static let defaultPingInterval: Duration = .seconds(5)
     /// How long after a registration starts the keys are registered again (spec §5.4.4).
@@ -185,6 +190,18 @@ public actor CluSession {
 
     // MARK: - Lifecycle (spec §5.4.5)
 
+    // Dropping a session without stop() must not keep its socket and tasks
+    // alive for the rest of the process: the routers hold the session
+    // weakly, so once the owner lets go this runs and closes the socket,
+    // which also ends the router loop. The CLU's subscriptions then simply
+    // expire; only stop() sends clientDestroy.
+    deinit {
+        pingLoopTask?.cancel()
+        registerLoopTask?.cancel()
+        mainRouterTask?.cancel()
+        mainSocket?.close()
+    }
+
     /// Idempotent. Opens the main socket, performs the initial ping and
     /// starts the ping loop. Failure is not fatal: the session ends up
     /// `degraded` and every later ping retries (including reopening the
@@ -278,7 +295,8 @@ public actor CluSession {
     }
 
     private func pingInternal(gateHeld: Bool) async -> Bool {
-        guard state != .stopped else { return false }
+        // Only start() opens a session (spec §5.4.5).
+        guard state != .stopped, state != .idle else { return false }
 
         // A ping is already in flight (they all share keepAliveId) — don't
         // race it and don't disturb the state it will set.
@@ -301,6 +319,7 @@ public actor CluSession {
         do {
             _ = try await sendRequest(Payloads.checkAlive, msgId: keepAliveId, over: socket)
             guard state != .stopped, generation == mainSocketGeneration else { return false }
+            consecutivePingTimeouts = 0
             if needsRecovery && !desiredKeys.isEmpty {
                 await recoverSubscriptions(gateHeld: gateHeld)
                 // The socket may have failed or been replaced meanwhile.
@@ -317,6 +336,16 @@ public actor CluSession {
             guard generation == mainSocketGeneration else { return false }
             logger.warning("[\(clu.name)] Ping failed: \(error)")
             if state != .stopped { state = .degraded; needsRecovery = needsRecovery || !desiredKeys.isEmpty }
+            // Three unanswered pings in a row retire the socket: a transport
+            // that lost its network may never finish a send on it, and a new
+            // socket is a new port with clean subscriptions (spec §5.4.5).
+            if case SessionError.timeout = error {
+                consecutivePingTimeouts += 1
+                if consecutivePingTimeouts >= Self.pingTimeoutsBeforeReplacing {
+                    logger.warning("[\(clu.name)] \(consecutivePingTimeouts) pings unanswered; replacing the main socket")
+                    abandonMainSocket()
+                }
+            }
             return false
         }
     }
@@ -334,7 +363,7 @@ public actor CluSession {
         guard state != .stopped, needsRecovery, !desiredKeys.isEmpty else { return }
         let keys = desiredKeys
         let generation = mainSocketGeneration
-        let slots = await registerLocked(keys)
+        let slots = await registerLocked(keys, publishingChunks: true)
         guard state != .stopped else { return }
         scheduleReregistration()
         guard !slots.allSatisfy({ $0 == .failed }) else { return }
@@ -342,7 +371,6 @@ public actor CluSession {
         // A socket lost or replaced meanwhile (e.g. a stuck destroy) leaves
         // the subscriptions on the old port: recover even if every slot succeeded.
         needsRecovery = slots.contains(.failed) || generation != mainSocketGeneration
-        publishReport(ChunkReport(keys: keys, slots: slots))
     }
 
     /// Single-flight main-socket open: concurrent callers share one attempt
@@ -360,6 +388,7 @@ public actor CluSession {
     }
 
     private func openAndInstallMainSocket() async {
+        consecutivePingTimeouts = 0
         do {
             let socket = try await openTracked()
             guard state != .stopped, mainSocket == nil else {
@@ -400,8 +429,9 @@ public actor CluSession {
     public func register(_ keys: [ValueRef]) async -> [RegistrationSlot] {
         guard await beginOperation() else { return keys.map { _ in .failed } }
         defer { endOperation() }
-        // Stopped while queued: the keys must not outlive stop() (spec §5.4.5).
-        guard state != .stopped else { return keys.map { _ in .failed } }
+        // Before start(), or stopped while queued: nothing is sent and the
+        // keys are not remembered (spec §5.4.5).
+        guard state != .stopped, state != .idle else { return keys.map { _ in .failed } }
         desiredKeys = keys
         let generation = mainSocketGeneration
         let slots = await registerLocked(keys)
@@ -492,20 +522,24 @@ public actor CluSession {
         guard await beginOperation() else { return }
         defer { endOperation() }
         guard state != .stopped, !desiredKeys.isEmpty else { return }
+        // No renewal while degraded: every chunk would time out, and the
+        // recovery after the next successful ping registers anyway. The
+        // missed deadline is not caught up (spec §5.4.4).
+        guard state != .degraded else { reregistrationDeadline = nil; return }
         let keys = desiredKeys
         let generation = mainSocketGeneration
-        let slots = await registerLocked(keys)
+        let slots = await registerLocked(keys, publishingChunks: true)
         guard state != .stopped else { return }
         // A socket lost or replaced meanwhile (e.g. a stuck destroy) leaves
         // the subscriptions on the old port: recover even if every slot succeeded.
         needsRecovery = slots.contains(.failed) || generation != mainSocketGeneration
         scheduleReregistration()
-        guard !slots.allSatisfy({ $0 == .failed }) else { return }
-        publishReport(ChunkReport(keys: keys, slots: slots))
     }
 
-    /// Body of `register` — requires the operation gate to be held.
-    private func registerLocked(_ keys: [ValueRef]) async -> [RegistrationSlot] {
+    /// Body of `register` — requires the operation gate to be held. With
+    /// `publishingChunks` (loop renewal and recovery) every answered chunk
+    /// reaches the report path as soon as it is answered (spec §5.4.3–§5.4.4).
+    private func registerLocked(_ keys: [ValueRef], publishingChunks: Bool = false) async -> [RegistrationSlot] {
         reregistrationDeadline = nil
         guard state != .stopped else { return keys.map { _ in .failed } }
         guard !keys.isEmpty else {
@@ -534,7 +568,11 @@ public actor CluSession {
         // registration removed every timeout (live, 2026-09-30).
         var results: [RegistrationSlot] = []
         for chunk in plan {
-            results += await registerChunk(chunk)
+            let slots = await registerChunk(chunk)
+            results += slots
+            if publishingChunks, state != .stopped, !slots.contains(.failed) {
+                publishReport(ChunkReport(keys: chunk.keys, slots: slots))
+            }
         }
         guard state != .stopped else { return results }   // stop() destroyed them
 
@@ -688,8 +726,8 @@ public actor CluSession {
         AsyncStream(bufferingPolicy: .bufferingNewest(64)) { continuation in
             let id = UUID()
             reportSubscribers[id] = continuation
-            continuation.onTermination = { _ in
-                Task { await self.removeReportSubscriber(id) }
+            continuation.onTermination = { [weak self] _ in
+                Task { await self?.removeReportSubscriber(id) }
             }
         }
     }
