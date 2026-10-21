@@ -186,7 +186,24 @@ from the doc comments and the `.docc` catalogs.
 
 ## Requirements
 
-Swift 6.0+, iOS 16+ / macOS 13+.
+Swift 6.0+, iOS 16+ / macOS 13+. Apple platforms only: the runtime uses
+Network.framework and CommonCrypto, so there is no Linux build.
+
+## Versioning and stability
+
+Releases are tagged with the version of the specification they implement
+(`0.9.1` implements spec 0.9.1 and passes suite 0.9.1). Until 1.0 the
+package promises conformance with the spec, not a frozen API:
+`GrentonDevices` and `GrentonProvisioning` are the modules an app is meant
+to use and change deliberately; `GrentonModel` and `GrentonRuntime` are
+plumbing between them and may still change shape. Every change is listed in
+[`CHANGELOG.md`](CHANGELOG.md).
+
+## License
+
+[MIT](LICENSE). The specification and its conformance suite
+([grenton-core-spec](https://github.com/osieckiAdam/grenton-core-spec)) are
+MIT as well.
 
 ## Running the tests
 
