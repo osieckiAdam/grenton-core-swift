@@ -5,6 +5,17 @@ Versions follow the specification the port implements; see README,
 
 ## Unreleased
 
+- Follows spec 0.10.1 (suite 0.10.1, 232 cases). The `.omp` import converts
+  every widget type of the mobile interface — `CAMERA`, `LED`,
+  `CONTACT_SENSOR`, `CONTACT_SENSOR_DOUBLE`, `SLIDER`, `MULTISENSOR`, the
+  legacy `ROLLER_SHUTTER` — and the new `TV_REMOTE_CONTROL` (known, not
+  mapped); a widget never sent to a phone, which has no `dtoId`, gets the
+  stand-in id `omp-<editor id>`, and two widgets with one id fail the
+  import. Checked against a real installation: an interface imported from
+  its project equals the one downloaded for it, field for field.
+- A registration with a failed chunk is recovered by the next answered
+  ping in any state (now stated by the spec); every conformance scenario
+  ends with an implicit quiet check.
 - `GrentonSystem(interfaceArchive:)` starts from the downloaded or saved
   archive directly; `GrentonDevices` now depends on `GrentonProvisioning`.
   `GrentonSystem.clus` lists the CLUs, so an app can name the one behind a

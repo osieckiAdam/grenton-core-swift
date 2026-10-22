@@ -60,6 +60,17 @@ final class SessionScenario: @unchecked Sendable {
                                 "step": step, "observed": .string(String(describing: error))])
             }
         }
+        // The end of a scenario is an implicit expectQuiet and expectNoReport
+        // (conformance.md §4b): nothing the steps did not check may be left,
+        // before the runner's own stop() sends its destroys.
+        do {
+            try await perform(.object(["expectQuiet": .bool(true)]))
+            try await perform(.object(["expectNoReport": .bool(true)]))
+        } catch {
+            await session.stop()
+            return .object(["completed": .bool(false), "failedStep": .number(Double(steps.count)),
+                            "step": .string("end of scenario"), "observed": .string(String(describing: error))])
+        }
         await session.stop()
         return .object(["completed": .bool(true)])
     }

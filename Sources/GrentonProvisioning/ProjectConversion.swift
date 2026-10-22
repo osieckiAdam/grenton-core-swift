@@ -19,12 +19,19 @@ enum ProjectConversion {
 
     static func pages(_ editorPages: [JSONValue]) throws -> Pages {
         var out = Pages()
+        var ids: Set<String> = []
         for page in editorPages {
             guard let label = page["label"]?.stringValue, let icon = page["icon"]?.stringValue,
                   let widgets = page["widgets"]?.arrayValue else {
                 throw ProvisioningError.invalidData("a page lacks label, icon or widgets")
             }
             let converted = widgets.map { widget($0, used: &out.usedCluIds) }
+            // Two widgets with one id after conversion (spec §4.5.6).
+            for w in converted {
+                if let id = w["id"]?.stringValue, !ids.insert(id).inserted {
+                    throw ProvisioningError.invalidData("two widgets share the id \(id)")
+                }
+            }
             out.pages.append(.object([
                 ("name", .string(label)), ("icon", .string(icon)),
                 ("isFullscreenWidget", .bool(false)), ("widgets", .array(converted)),
@@ -41,10 +48,20 @@ enum ProjectConversion {
             return try convertWidget(w, used: &used)
         } catch {
             var stub: [(String, JSONValue)] = []
-            if let id = w["dtoId"]?.stringValue { stub.append(("id", .string(id))) }
+            if let id = widgetId(w) { stub.append(("id", .string(id))) }
             if let type = w["type"]?.stringValue { stub.append(("type", .string(type))) }
             return .object(stub)
         }
+    }
+
+    /// Spec §4.5.6: `dtoId` when it is a non-empty string; otherwise — a
+    /// widget never sent to a phone has none — `omp-` and the decimal text
+    /// of the editor's non-negative integer `id`. The prefix keeps a
+    /// stand-in from ever equalling a real `dtoId`.
+    static func widgetId(_ w: JSONValue) -> String? {
+        if let id = w["dtoId"]?.stringValue, !id.isEmpty { return id }
+        if case .int(let editorId)? = w["id"], editorId >= 0 { return "omp-\(editorId)" }
+        return nil
     }
 
     private static func need(_ w: JSONValue, _ key: String) throws -> JSONValue {
@@ -59,7 +76,7 @@ enum ProjectConversion {
     }
 
     private static func convertWidget(_ w: JSONValue, used: inout Set<String>) throws -> JSONValue {
-        guard w.isObject, let type = try need(w, "type").stringValue, let id = try need(w, "dtoId").stringValue else {
+        guard w.isObject, let type = try need(w, "type").stringValue, let id = widgetId(w) else {
             throw Missing()
         }
         var out: [(String, JSONValue)] = [("id", .string(id)), ("type", .string(type))]
@@ -100,10 +117,85 @@ enum ProjectConversion {
         case "ROLLER_SHUTTER_V3", "EVENT_SCHEDULER":
             copy(["icon", "label"], from: w, into: &out)
             out.append(("object", objectBlock(try needObject(w, "object"), used: &used)))
+        case "CAMERA":
+            let stream = try needObject(w, "cameraStream")
+            var component: [(String, JSONValue)] = [("unit", .string("UNKNOWN"))]
+            copy(["image", "label", "type", "rowId"], from: stream, into: &component)
+            if let url = stream["url"] { component.append(("value", url)) }
+            out.append(("components", .array([.object(component)])))
+        case "LED":
+            var components = [bistable(try needObject(w, "buttonBistable"), used: &used)]
+            for key in ["sliderHue", "sliderSaturation", "sliderBrightness"] {
+                components.append(ledSlider(try needObject(w, key), used: &used))
+            }
+            out.append(("components", .array(components)))
+        case "CONTACT_SENSOR":
+            out += try contactFields(w, used: &used)
+        case "CONTACT_SENSOR_DOUBLE":
+            out.append(("componentLeft", .object(try contactFields(try needObject(w, "componentLeft"), used: &used))))
+            out.append(("componentRight", .object(try contactFields(try needObject(w, "componentRight"), used: &used))))
+        case "SLIDER":
+            copy(["unit", "min", "max", "precision", "icon", "label"], from: w, into: &out)
+            out.append(("object", objectBlock(try needObject(w, "object"), used: &used)))
+        case "MULTISENSOR":
+            copy(["icon", "label", "labelVisible"], from: w, into: &out)
+            for (editorKey, mobileKey) in Self.multisensorChannels {
+                guard let channel = w[editorKey], channel.isObject else { continue }
+                out.append((mobileKey, refsOnly(channel, used: &used)))
+            }
+        case "ROLLER_SHUTTER":
+            let button = try needObject(w, "buttonBistableClick")
+            var component: [(String, JSONValue)] = [("unit", .string("UNKNOWN"))]
+            copy(["image", "label", "indication", "rowId"], from: button, into: &component)
+            if let state = ref(button["state"], used: &used) { component.append(("state", state)) }
+            if let type = button["type"] {
+                component.append(("type", type.stringValue == "BUTTON_BISTABLE_CLICK" ? .string("BUTTON_BISTABLE") : type))
+            }
+            component.append(("actions", .array([action(button["actionClick"], used: &used)].compactMap { $0 })))
+            out.append(("components", .array([.object(component)])))
+        case "TV_REMOTE_CONTROL":
+            copy(["vodLabel", "icon", "label"], from: w, into: &out)
+            out.append(("object", objectBlock(try needObject(w, "object"), used: &used)))
         default:
             throw Missing()
         }
         return .object(out)
+    }
+
+    /// Editor key → mobile key; the editor spells the VOC channel `objectAirVco` (spec §4.5.6 K).
+    private static let multisensorChannels: [(String, String)] = [
+        ("objectAirCo2", "objectAirCo2"), ("objectSound", "objectSound"), ("objectAirVco", "objectAirVoc"),
+        ("objectLight", "objectLight"), ("objectPressure", "objectPressure"), ("objectHumidity", "objectHumidity"),
+        ("objectTemperature", "objectTemperature"),
+    ]
+
+    /// Every member that is an existing reference, under its own name (K).
+    private static func refsOnly(_ channel: JSONValue, used: inout Set<String>) -> JSONValue {
+        var out: [(String, JSONValue)] = []
+        for (name, value) in channel.members ?? [] {
+            if let converted = ref(value, used: &used) { out.append((name, converted)) }
+        }
+        return .object(out)
+    }
+
+    /// S of spec §4.5.6: an LED slider.
+    private static func ledSlider(_ s: JSONValue, used: inout Set<String>) -> JSONValue {
+        var out: [(String, JSONValue)] = []
+        copy(["unit", "label", "type", "rowId"], from: s, into: &out)
+        var range: [(String, JSONValue)] = []
+        copy(["min", "max"], from: s, into: &range)
+        out.append(("range", .object(range)))
+        if let state = ref(s["state"], used: &used) { out.append(("state", state)) }
+        out.append(("actions", .array([action(s["actionClick"], used: &used)].compactMap { $0 })))
+        return .object(out)
+    }
+
+    /// The fields of a contact sensor, shared by the single and the double widget.
+    private static func contactFields(_ c: JSONValue, used: inout Set<String>) throws -> [(String, JSONValue)] {
+        var out: [(String, JSONValue)] = []
+        copy(["icon", "label", "onIndication", "offIndication", "reverseState"], from: c, into: &out)
+        out.append(("object", objectBlock(try needObject(c, "object"), used: &used)))
+        return out
     }
 
     /// Copies the fields that are present, `null` included (spec §4.5.6).
