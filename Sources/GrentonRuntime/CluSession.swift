@@ -119,6 +119,10 @@ public actor CluSession {
     private var subscriptions: [Int: [ValueRef]] = [:]
     /// The next fresh subscription number; restarts at 1 in `start()`.
     private var nextNumber = 1
+
+    /// Tests only: the number the next new chunk gets, to reach the
+    /// six-digit rollover without a million registrations.
+    func setNextNumberForTesting(_ number: Int) { nextNumber = number }
     /// Six digits, matching the reservation of the chunk split (spec §5.4.2 pt 1).
     private static let maxNumber = 999_999
     /// When the latest registration's first chunk was sent, plus the

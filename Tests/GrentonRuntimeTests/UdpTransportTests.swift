@@ -111,6 +111,29 @@ import Network
         #expect(try await exchange(message, over: socket) == message)
     }
 
+    // The contract CluSession relies on (Transport.swift): close() ends the
+    // incoming stream, so a router task waiting on it finishes instead of
+    // living on with the socket.
+    @Test(arguments: [false, true])
+    func closeEndsTheIncomingStream(anySource: Bool) async throws {
+        let factory: any UdpSocketFactory = anySource ? AnySourceUdpSocketFactory() : NetworkUdpSocketFactory()
+        let socket = try await factory.open(host: "127.0.0.1", port: 9)
+        let reader = Task { () -> Bool in
+            for await _ in socket.incoming {}
+            return true
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        socket.close()
+        let finished = await withTaskGroup(of: Bool.self) { group in
+            group.addTask { await reader.value }
+            group.addTask { try? await Task.sleep(for: .seconds(2)); return false }
+            let first = await group.next() ?? false
+            group.cancelAll()
+            return first
+        }
+        #expect(finished, "incoming did not end within 2 s of close()")
+    }
+
     @Test func distinctSocketsGetDistinctLocalPorts() async throws {
         let server = try EchoServer()
         let port = try await server.start()

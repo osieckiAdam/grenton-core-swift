@@ -281,21 +281,32 @@ final class MockExecutor: CommandExecuting, @unchecked Sendable {
         }
 
         let stream = toggle.updates()
-        var iterator = stream.makeAsyncIterator()
+        let events = Counter()
+        let consumer = Task { for await _ in stream { events.increment() } }
+        defer { consumer.cancel() }
+        func settle() async { try? await Task.sleep(for: .milliseconds(100)) }
 
-        // Foreign key first — must NOT produce an event for this entity.
+        // A foreign key must not produce an event for this entity.
         store.updateKeys(
             [.attribute(cluId: "CLU_501234567", objectName: "DIM3333", index: "0")],
             [.value(.int(1))])
-        // Own key second.
+        await settle()
+        #expect(events.value == 0)
+        #expect(toggle.isOn == nil)
+
+        // The entity's own key does, once per change.
         store.updateKeys(
             [.attribute(cluId: "CLU_501234567", objectName: "DOU8272", index: "0")],
             [.value(.string("ON"))])
-
-        _ = await iterator.next()
-        // After consuming exactly one event the entity's state reflects
-        // the own-key update; a foreign-key event would have arrived first
-        // with isOn still nil.
+        await settle()
+        #expect(events.value == 1)
         #expect(toggle.isOn == true)
+    }
+
+    private final class Counter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+        var value: Int { lock.withLock { count } }
+        func increment() { lock.withLock { count += 1 } }
     }
 }

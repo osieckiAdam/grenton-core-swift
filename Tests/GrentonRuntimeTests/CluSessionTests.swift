@@ -70,6 +70,27 @@ import GrentonTestSupport
         #expect(await fake.destroyedNumbers.isEmpty)
     }
 
+    // Spec §5.4.2 pt 1: out of six-digit numbers, the session destroys
+    // everything, moves to a new socket and numbers from 1 again.
+    @Test func numberRolloverRestartsOnANewSocket() async throws {
+        let (fake, session) = try makeFixture()
+        await session.start()
+        await session.setNextNumberForTesting(999_999)
+        _ = await session.register(attributeKeys(1))
+        #expect(await fake.registrations.last?.sessionId == 999_999)
+        let firstSocket = await fake.openedSockets.last
+
+        // A different list needs a new number, which would be 1 000 000.
+        _ = await session.register(attributeKeys(2))
+        #expect(await fake.destroyedNumbers == [999_999])
+        #expect(firstSocket?.isClosed == true)
+        #expect(await fake.openedSockets.count == 2)
+        #expect(await fake.registrations.last?.sessionId == 1)
+        #expect(await fake.registrations.last?.socket === fake.openedSockets.last)
+        #expect(await session.state == .ready)
+        await session.stop()
+    }
+
     @Test func startPingsAndBecomesReady() async throws {
         let (fake, session) = try makeFixture()
         await session.start()
