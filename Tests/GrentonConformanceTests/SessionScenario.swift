@@ -284,7 +284,7 @@ final class SessionScenario: @unchecked Sendable {
         }
     }
 
-    static func slot(_ slot: RegistrationSlot) -> JSON {
+    static func slot(_ slot: ValueSlot) -> JSON {
         switch slot {
         case .failed: return .object(["failed": .bool(true)])
         case .value(let value): return Operations.tagged(value)

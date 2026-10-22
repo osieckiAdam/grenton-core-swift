@@ -5,6 +5,38 @@ Versions follow the specification the port implements; see README,
 
 ## Unreleased
 
+- Follows spec 0.11.1 (suite 0.11.1, unchanged cases). An entity's
+  `updates()` can no longer lose a signal: the store filters by key under
+  its lock and keeps a flag per subscriber, instead of a forwarding task
+  over the shared, bounded change stream, where a burst of other keys'
+  changes could displace the entity's own before the task ran (spec §6.5).
+  `GrentonSystem.changes()` is documented as best effort.
+- `GrentonSystem.diagnostics()` and `CluSession.diagnostics`: a
+  `SessionDiagnostics` snapshot per CLU — state, time since the last
+  reply and the last report, the last ping's round trip, requested key
+  count, whether recovery is pending, unanswered pings in a row (spec
+  §5.4.5). Every CLU of the interface is listed, `idle` before `start()`.
+- `GrentonKit`, the umbrella module: `import GrentonKit` re-exports the
+  four modules, and `GrentonSystem(interfaceArchive:)` lives there, so
+  `GrentonDevices` depends on Model and Runtime only again (spec §2). The
+  app-facing examples build against the public API only
+  (`packageAccess: false`) with that one import.
+- `GrentonSimulation`: `SimulatedGrentonSystem` builds the same devices
+  and entities over values a test sets (`set(_:to:)`, `clear(_:)`), records
+  every command (`executedActions`) and fails them on request. For an
+  app's test target; not part of `GrentonKit`. Article "Testing Your App".
+- `RegistrationSlot` is `ValueSlot` (deprecated alias kept); it is the
+  result of a one-shot read as much as of a registration.
+  `StateChange` has a public initializer. `BoundDevice` and `BoundEntity`
+  are no longer `Hashable`: by-id equality made handles of different
+  systems interchangeable. They stay `Identifiable`.
+- Gates: the doc-snippet check compiles each snippet group with exactly
+  the imports it shows (`GrentonKit` when none) and the consumer
+  scenarios in `scripts/consumer/` — complete app code against the public
+  API, no `@testable`. `scripts/docs.sh` puts the working tree's
+  `Package.resolved` back byte for byte as soon as the generation ends
+  (it restored the index's copy, on exit). The DocC plugin is a dependency
+  only when `GRENTON_DOCS` is exactly `1`.
 - Gates: `scripts/check.sh` fails when the git hooks are not enabled or the
   installation-data gate differs from the spec's copy; that gate also reads
   a declared `.omp` (`git config grenton.project`), scans ZIP/.omp files

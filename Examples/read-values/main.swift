@@ -1,7 +1,5 @@
 import Foundation
-import GrentonModel
-import GrentonProvisioning
-import GrentonDevices
+import GrentonKit
 
 /// Example: read a CLU value once, without subscribing to it.
 ///
@@ -25,7 +23,7 @@ let system = try GrentonSystem(
 let cluId = arguments[2]
 
 // 1. The keys to read: an object name and a feature index each.
-let refs: [ValueRef] = try arguments[3...].map { spec in
+let refs: [ValueRef] = arguments[3...].map { spec in
     let parts = spec.split(separator: ":")
     guard parts.count == 2 else {
         print("bad key \(spec); use OBJ:IDX, e.g. DOU1001:0")

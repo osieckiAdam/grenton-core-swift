@@ -1,6 +1,5 @@
 import Foundation
-import GrentonProvisioning
-import GrentonDevices
+import GrentonKit
 
 /// Example: run a scene from the mobile interface.
 ///

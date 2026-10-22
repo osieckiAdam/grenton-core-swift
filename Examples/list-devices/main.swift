@@ -1,6 +1,5 @@
 import Foundation
-import GrentonProvisioning
-import GrentonDevices
+import GrentonKit
 
 /// Example: list the devices of an installation, offline.
 ///

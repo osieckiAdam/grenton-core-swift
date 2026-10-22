@@ -1,7 +1,5 @@
 import Foundation
-import GrentonModel
-import GrentonProvisioning
-import GrentonDevices
+import GrentonKit
 
 /// Example: read the mobile interface from an Object Manager project file.
 ///

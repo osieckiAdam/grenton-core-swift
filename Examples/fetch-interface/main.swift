@@ -1,5 +1,5 @@
 import Foundation
-import GrentonProvisioning
+import GrentonKit
 
 /// Example: download the mobile interface from Object Manager and save it.
 ///

@@ -39,22 +39,90 @@ public enum TransportError: Error, Sendable, Equatable {
     case connectionFailed(String)
 }
 
-/// Result slot of a registration position (spec §5.4.2): distinguishes a
-/// failed chunk from a real value — including a real `nil` from the CLU.
-public enum RegistrationSlot: Sendable, Equatable {
+/// Result slot of one key of a registration or a one-shot read (spec
+/// §5.4.2): distinguishes a failed chunk from a real value — including a
+/// real `nil` from the CLU.
+public enum ValueSlot: Sendable, Equatable {
     /// The CLU did not answer for this key, or answered unusably; the stored value is unchanged.
     case failed
     /// The value the CLU reported, `.null` included.
     case value(GrentonValue)
 }
 
+@available(*, deprecated, renamed: "ValueSlot")
+public typealias RegistrationSlot = ValueSlot
+
+/// What one CLU connection has seen lately (spec §5.4.5, "migawka
+/// diagnostyczna"): one consistent observation of one session. Times are
+/// ages at the moment of sampling. Snapshots of several CLUs taken one
+/// after another are not one picture of the installation.
+///
+/// Use it to tell the user whether the house answers:
+///
+/// ```swift
+/// for (cluId, health) in await system.diagnostics() where health.state != .ready {
+///     print(cluId, health.state, health.sinceLastReply ?? "never answered")
+/// }
+/// ```
+public struct SessionDiagnostics: Sendable, Equatable {
+    /// The connection state.
+    public let state: SessionState
+    /// How long ago the CLU last answered a request of this connection;
+    /// `nil` when it has not since the last ``CluSession/start()``. A reply
+    /// counts once it matches its request, even if its content then fails
+    /// the operation.
+    public let sinceLastReply: Duration?
+    /// How long ago the CLU last pushed a report this connection accepted;
+    /// `nil` when none since the last start. The values of a registration's
+    /// own reply are not a report.
+    public let sinceLastReport: Duration?
+    /// How long the last answered ping took, from the hand-over to the
+    /// transport to its reply; `nil` when no ping was answered since the
+    /// last start.
+    public let lastPingRoundTrip: Duration?
+    /// How many keys the last registration asked for — the full list,
+    /// whether or not every chunk succeeded; 0 before the first
+    /// registration and after `stop()`.
+    public let requestedKeyCount: Int
+    /// Whether the keys must be registered again: a chunk failed or the
+    /// CLU stopped answering. Cleared by a registration with no failed
+    /// chunk, by registering no keys, and by `stop()`.
+    public let recoveryPending: Bool
+    /// Pings in a row the CLU did not answer on the current socket; three
+    /// replace the socket. Without a socket, the last socket's count; 0
+    /// after `stop()`.
+    public let consecutivePingTimeouts: Int
+
+    /// Creates a snapshot, for simulations and tests.
+    public init(
+        state: SessionState,
+        sinceLastReply: Duration? = nil,
+        sinceLastReport: Duration? = nil,
+        lastPingRoundTrip: Duration? = nil,
+        requestedKeyCount: Int = 0,
+        recoveryPending: Bool = false,
+        consecutivePingTimeouts: Int = 0
+    ) {
+        self.state = state
+        self.sinceLastReply = sinceLastReply
+        self.sinceLastReport = sinceLastReport
+        self.lastPingRoundTrip = lastPingRoundTrip
+        self.requestedKeyCount = requestedKeyCount
+        self.recoveryPending = recoveryPending
+        self.consecutivePingTimeouts = consecutivePingTimeouts
+    }
+
+    /// A connection that was never started.
+    public static let idle = SessionDiagnostics(state: .idle)
+}
+
 /// Report delivered for one subscription chunk: the chunk's keys paired
 /// positionally with the reported values.
 public struct ChunkReport: Sendable, Equatable {
     public let keys: [ValueRef]
-    public let slots: [RegistrationSlot]
+    public let slots: [ValueSlot]
 
-    public init(keys: [ValueRef], slots: [RegistrationSlot]) {
+    public init(keys: [ValueRef], slots: [ValueSlot]) {
         self.keys = keys
         self.slots = slots
     }

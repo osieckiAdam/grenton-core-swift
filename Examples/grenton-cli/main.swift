@@ -1,8 +1,5 @@
 import Foundation
-import GrentonModel
-import GrentonRuntime
-import GrentonProvisioning
-import GrentonDevices
+import GrentonKit
 
 /// Live-installation smoke tool (milestone 7): fetches the interface from
 /// a running Object Manager, lists the canonical devices, connects to the

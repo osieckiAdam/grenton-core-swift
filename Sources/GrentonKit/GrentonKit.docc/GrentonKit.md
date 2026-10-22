@@ -1,0 +1,28 @@
+# ``GrentonKit``
+
+Everything an app needs, in one import.
+
+## Overview
+
+`import GrentonKit` brings in `GrentonModel`, `GrentonRuntime`,
+`GrentonProvisioning` and `GrentonDevices`, plus the conveniences that
+join them: creating a `GrentonSystem` straight from an interface archive.
+
+```swift
+import GrentonKit
+
+let archive = try Data(contentsOf: URL(fileURLWithPath: "interface.zip"))
+let system = try GrentonSystem(interfaceArchive: archive)
+await system.start()
+```
+
+The four modules stay available on their own for an app that wants only
+some of them — the devices without the Object Manager client, say — and
+none of them depends on this one. The reference for the types lives with
+their modules; start with `GrentonDevices`.
+
+## Topics
+
+### Starting from an archive
+
+- ``GrentonDevices/GrentonSystem/init(interfaceArchive:socketFactory:logger:pingInterval:registerInterval:responseTimeout:)``

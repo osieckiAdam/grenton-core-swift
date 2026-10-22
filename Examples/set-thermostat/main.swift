@@ -1,7 +1,5 @@
 import Foundation
-import GrentonProvisioning
-import GrentonRuntime
-import GrentonDevices
+import GrentonKit
 
 /// Example: set a thermostat's manual set point through the library and
 /// check that the CLU applied it.

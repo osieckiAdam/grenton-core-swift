@@ -23,21 +23,12 @@ package struct DeviceContext: Sendable {
     }
 }
 
-/// Per-subscriber update signal: fires when any of `keys` changes.
+/// Per-subscriber update signal: fires when any of `keys` changes. The
+/// store filters under its lock (spec §6.5): a signal cannot be lost to
+/// other keys' changes, which a filter on top of the shared, bounded
+/// change stream allowed.
 func filteredUpdates(keys: Set<ValueRef>, store: StateStore) -> AsyncStream<Void> {
-    // Subscribe SYNCHRONOUSLY — deferring store.changes() into the task
-    // would race the forwarding task's start against the first update and
-    // silently drop events published in between.
-    let changes = store.changes()
-    return AsyncStream(bufferingPolicy: .bufferingNewest(8)) { continuation in
-        let task = Task {
-            for await change in changes where keys.contains(change.key) {
-                continuation.yield(())
-            }
-            continuation.finish()
-        }
-        continuation.onTermination = { _ in task.cancel() }
-    }
+    store.updates(for: keys)
 }
 
 // MARK: - Stage 2: binding
@@ -60,11 +51,13 @@ public struct BoundDevice: Sendable {
     public let entities: [BoundEntity]
 }
 
-extension BoundDevice: Identifiable, Hashable {
-    /// The widget id; the same as ``DeviceDescriptor/id``.
+// Identifiable only, not Hashable (review finding): two systems built from
+// the same interface would compare equal by id while commanding different
+// executors. Ids are scoped to an installation; key your own collections
+// by `id`.
+extension BoundDevice: Identifiable {
+    /// The widget id; the same as ``DeviceDescriptor/id``. Unique within one installation.
     public var id: String { descriptor.id }
-    public static func == (lhs: BoundDevice, rhs: BoundDevice) -> Bool { lhs.id == rhs.id }
-    public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 /// A live entity: something you read or control, such as a light, a
@@ -813,7 +806,4 @@ extension ToggleEntity: SwitchableEntity {}
 extension DimmableLightEntity: SwitchableEntity {}
 extension HsbLightEntity: SwitchableEntity {}
 
-extension BoundEntity: Identifiable, Hashable {
-    public static func == (lhs: BoundEntity, rhs: BoundEntity) -> Bool { lhs.id == rhs.id }
-    public func hash(into hasher: inout Hasher) { hasher.combine(id) }
-}
+extension BoundEntity: Identifiable {}

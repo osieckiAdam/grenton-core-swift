@@ -28,7 +28,8 @@ connection.
 
 Get the interface once from Object Manager with
 `ProvisioningClient` and save it, so later starts need
-no PIN.
+no PIN. `import GrentonKit` brings this module in together with the
+others.
 
 ## Topics
 
@@ -44,6 +45,7 @@ no PIN.
 
 - <doc:ObservingState>
 - <doc:ControllingDevices>
+- <doc:TestingYourApp>
 - ``BoundDevice``
 - ``BoundEntity``
 - ``SwitchableEntity``

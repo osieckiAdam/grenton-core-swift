@@ -21,19 +21,31 @@ mkdir -p "$SITE"
 cp -R site/. "$SITE/"
 cp docs/images/om-send-to-mobile.png "$SITE/assets/"
 
-# The DocC plugin is a dependency only while GRENTON_DOCS is set
-# (Package.swift); SwiftPM then rewrites Package.resolved to include it, and
-# the committed file (without the plugin) is restored once the build is done.
-restore_resolved() { git checkout --quiet -- Package.resolved 2>/dev/null || true; }
+# The DocC plugin is a dependency only while GRENTON_DOCS=1 (Package.swift);
+# SwiftPM then rewrites Package.resolved to include it. The working tree's
+# own file — exactly as it was, staged or not, or absent — is put back as
+# soon as the generation ends, not when this script exits: in serve mode
+# that would leave the rewritten file in place for as long as the server
+# runs. (Restoring from the index instead would discard unstaged edits.)
+RESOLVED_BACKUP=$(mktemp)
+HAD_RESOLVED=0
+if [ -f Package.resolved ]; then cp Package.resolved "$RESOLVED_BACKUP"; HAD_RESOLVED=1; fi
+restore_resolved() {
+    if [ "$HAD_RESOLVED" = 1 ]; then cp "$RESOLVED_BACKUP" Package.resolved; else rm -f Package.resolved; fi
+    rm -f "$RESOLVED_BACKUP"
+    trap - EXIT
+}
 trap restore_resolved EXIT
 GRENTON_DOCS=1 swift package --allow-writing-to-directory "$SITE/api" generate-documentation \
     --target GrentonModel --target GrentonRuntime \
     --target GrentonProvisioning --target GrentonDevices \
+    --target GrentonKit --target GrentonSimulation \
     --enable-experimental-combined-documentation \
     --transform-for-static-hosting --warnings-as-errors \
     --experimental-enable-custom-templates \
     --hosting-base-path "${BASE_PATH}api" \
     --output-path "$SITE/api"
+restore_resolved
 
 # DocC can report an error and still exit 0; make sure the reference exists.
 # The shared header (GrentonDevices.docc/header.html) links back to the site

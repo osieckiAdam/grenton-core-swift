@@ -5,9 +5,19 @@ import GrentonModel
 // changed (spec §5.5 Δ).
 /// One value that changed on a CLU.
 public struct StateChange: Sendable, Equatable {
+    /// The value that changed.
     public let key: ValueRef
+    /// The value before; `nil` when it was not known yet (a CLU reporting nothing gives `GrentonValue.null`, not `nil`).
     public let oldValue: GrentonValue?
+    /// The value now.
     public let newValue: GrentonValue
+
+    /// Creates a change, for adapters and tests that build their own streams.
+    public init(key: ValueRef, oldValue: GrentonValue?, newValue: GrentonValue) {
+        self.key = key
+        self.oldValue = oldValue
+        self.newValue = newValue
+    }
 }
 
 // Per-installation state store (spec §5.5).
@@ -26,6 +36,9 @@ package final class StateStore: @unchecked Sendable {
     private var known: Set<ValueRef> = []
     private var order: [String: [ValueRef]] = [:]
     private var subscribers: [UUID: AsyncStream<StateChange>.Continuation] = [:]
+    // Key-filtered "something changed" flags (spec §6.5): filtered here,
+    // under the lock, so a flood of other keys can never displace them.
+    private var watchers: [UUID: (keys: Set<ValueRef>, sink: AsyncStream<Void>.Continuation)] = [:]
 
     package init() {}
 
@@ -64,7 +77,7 @@ package final class StateStore: @unchecked Sendable {
     /// never registered are ignored, mirroring the reference, unless
     /// `includingUnknown` is set: a one-shot read (`fetch`, spec §5.4.2)
     /// stores and announces them without making them a subscription.
-    package func updateKeys(_ keys: [ValueRef], _ slots: [RegistrationSlot], includingUnknown: Bool = false) {
+    package func updateKeys(_ keys: [ValueRef], _ slots: [ValueSlot], includingUnknown: Bool = false) {
         lock.lock()
         defer { lock.unlock() }
         // Yielding stays INSIDE the critical section: commit order and
@@ -81,6 +94,9 @@ package final class StateStore: @unchecked Sendable {
                 for sink in subscribers.values {
                     sink.yield(change)
                 }
+                for watcher in watchers.values where watcher.keys.contains(key) {
+                    watcher.sink.yield(())
+                }
             }
         }
     }
@@ -88,7 +104,43 @@ package final class StateStore: @unchecked Sendable {
     // A NEW stream per call — every subscriber observes independently
     // (spec §5.5 Δ). Slow subscribers drop oldest events; the current
     // state is always available synchronously via `value(for:)`.
-    /// A stream of every value change. It drops the oldest changes when you fall behind; the current value is always readable with ``value(for:)``.
+    /// Forgets a value: `value(for:)` returns `nil` again, as before the
+    /// CLU reported it. Entities watching the key are signalled; the raw
+    /// change stream is not (a change has a new value, "unknown" is none).
+    /// For simulations, which must be able to show "not reported yet".
+    package func clearValue(for ref: ValueRef) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard values.removeValue(forKey: ref) != nil else { return }
+        for watcher in watchers.values where watcher.keys.contains(ref) {
+            watcher.sink.yield(())
+        }
+    }
+
+    /// A flag stream for a set of keys: one `()` after every change of any
+    /// of them (spec §6.5). Changes coalesce while the consumer is busy — a
+    /// buffer of one — but a change can never be lost, however many other
+    /// keys change meanwhile, because the filter runs under the store lock
+    /// before any buffer (spec §5.5 Δ c). The new value is in the store
+    /// before the flag is observable.
+    package func updates(for keys: Set<ValueRef>) -> AsyncStream<Void> {
+        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            let id = UUID()
+            lock.lock()
+            watchers[id] = (keys, continuation)
+            lock.unlock()
+            continuation.onTermination = { [weak self] _ in
+                guard let self else { return }
+                self.lock.lock()
+                self.watchers[id] = nil
+                self.lock.unlock()
+            }
+        }
+    }
+
+    // Raw history, best effort (spec §5.5 Δ b): entities never observe
+    // through this — see `updates(for:)`.
+    /// A stream of value changes, best effort: it keeps the newest 64 when you fall behind and promises no complete history; the current value is always readable with ``value(for:)``.
     package func changes() -> AsyncStream<StateChange> {
         AsyncStream(bufferingPolicy: .bufferingNewest(64)) { continuation in
             let id = UUID()

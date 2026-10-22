@@ -55,13 +55,11 @@
 ],
 targets: [
     .target(name: "MyApp", dependencies: [
-        .product(name: "GrentonProvisioning", package: "grenton-core-swift"),
-        .product(name: "GrentonDevices", package: "grenton-core-swift"),
+        .product(name: "GrentonKit", package: "grenton-core-swift"),
     ]),
 ]</code></pre>
         <p>Download the interface once, then start from the saved copy and list your lights:</p>
-<pre><code class="language-swift">import GrentonProvisioning
-import GrentonDevices
+<pre><code class="language-swift">import GrentonKit
 
 // Once: Object Manager shows the address and the PIN in "Send to mobile devices".
 let archive = try await ProvisioningClient(host: "192.168.1.50").fetchInterfaceArchive(pin: "149 853")

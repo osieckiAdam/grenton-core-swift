@@ -1,5 +1,4 @@
 import Foundation
-import GrentonProvisioning
 import GrentonModel
 import GrentonRuntime
 
@@ -58,7 +57,7 @@ public actor GrentonSystem: CommandExecuting {
     /// Every device of the interface, one per widget, in page order.
     public nonisolated let devices: [BoundDevice]
 
-    /// The CLU controllers of the installation, as the interface lists them; their `id` keys ``sessionStates()``.
+    /// The CLU controllers of the installation, as the interface lists them; their `id` keys ``sessionStates()`` and ``diagnostics()``.
     public nonisolated let clus: [Clu]
     private let cipher: AesCbcCipher
     private let socketFactory: any UdpSocketFactory
@@ -116,36 +115,6 @@ public actor GrentonSystem: CommandExecuting {
         proxy.install(self)
     }
 
-    /// Creates the devices from an interface archive — the ZIP
-    /// `ProvisioningClient` downloads, or one saved
-    /// earlier. Nothing connects until ``start()``.
-    ///
-    /// - Parameters:
-    ///   - interfaceArchive: The archive as downloaded from Object Manager.
-    ///   - socketFactory: How to open UDP connections to the CLUs. Keep the
-    ///     default unless a CLU answers from a different address than the one
-    ///     in the interface; then pass `AnySourceUdpSocketFactory()`.
-    ///   - logger: Where the library reports problems. Silent by default.
-    ///   - pingInterval: How often each CLU is checked.
-    ///   - registerInterval: How often subscriptions are renewed and all values
-    ///     re-read.
-    ///   - responseTimeout: How long to wait for a CLU to answer a request.
-    /// - Throws: `ProvisioningError.invalidData` when the archive is not an
-    ///   interface, or an error if its encryption key is invalid.
-    public init(
-        interfaceArchive: Data,
-        socketFactory: any UdpSocketFactory = NetworkUdpSocketFactory(),
-        logger: GrentonLogger = .disabled,
-        pingInterval: Duration = CluSession.defaultPingInterval,
-        registerInterval: Duration = CluSession.defaultRegisterInterval,
-        responseTimeout: Duration = .seconds(5)
-    ) throws {
-        try self.init(
-            interface: try ProvisioningClient.parseInterfaceArchive(interfaceArchive),
-            socketFactory: socketFactory, logger: logger, pingInterval: pingInterval,
-            registerInterval: registerInterval, responseTimeout: responseTimeout)
-    }
-
     /// Devices grouped by what they operate on the CLU: one entry per
     /// thermostat, shutter or relay, however many widgets show it.
     ///
@@ -169,10 +138,12 @@ public actor GrentonSystem: CommandExecuting {
         store.value(for: ref)
     }
 
-    /// Every value change of every CLU, as it happens.
+    /// Every value change of every CLU, as it happens — best effort.
     ///
-    /// Each call makes a new stream; one that falls behind drops the oldest
-    /// changes, and ``value(for:)`` always has the current value.
+    /// Each call makes a new stream. It promises no complete history: one
+    /// that falls behind keeps only the newest 64 changes. To show state,
+    /// subscribe to an entity's `updates()` and read it; use this stream
+    /// for logging, and read ``value(for:)`` for the current value.
     public nonisolated func changes() -> AsyncStream<StateChange> {
         store.changes()
     }
@@ -284,6 +255,23 @@ public actor GrentonSystem: CommandExecuting {
         return states
     }
 
+    /// What each CLU connection has seen lately, keyed by CLU id — every
+    /// CLU of the interface, `SessionDiagnostics.idle` before ``start()``.
+    ///
+    /// Each value is one consistent observation of one CLU; the dictionary
+    /// is not one observation of the whole installation. Nothing is sent.
+    public func diagnostics() async -> [String: SessionDiagnostics] {
+        var result: [String: SessionDiagnostics] = [:]
+        for clu in clus {
+            if let session = sessions[clu.id] {
+                result[clu.id] = await session.diagnostics
+            } else {
+                result[clu.id] = .idle
+            }
+        }
+        return result
+    }
+
     // MARK: - Commands (CommandExecuting)
 
     /// Sends a raw action to its CLU. Entities call this for you; use it only
@@ -312,10 +300,10 @@ public actor GrentonSystem: CommandExecuting {
     /// through ``value(for:)`` without becoming a subscription. A read that
     /// arrives after a newer report of the same key can briefly show the
     /// older value; the next report corrects it.
-    public func fetch(_ refs: [ValueRef]) async -> [RegistrationSlot] {
-        var slots = [RegistrationSlot](repeating: .failed, count: refs.count)
+    public func fetch(_ refs: [ValueRef]) async -> [ValueSlot] {
+        var slots = [ValueSlot](repeating: .failed, count: refs.count)
         let positions = Dictionary(grouping: refs.indices, by: { refs[$0].cluId })
-        await withTaskGroup(of: (String, [RegistrationSlot]).self) { group in
+        await withTaskGroup(of: (String, [ValueSlot]).self) { group in
             for (cluId, indices) in positions {
                 guard let session = sessions[cluId] else { continue }
                 let keys = indices.map { refs[$0] }

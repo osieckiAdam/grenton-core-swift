@@ -303,6 +303,40 @@ final class MockExecutor: CommandExecuting, @unchecked Sendable {
         #expect(toggle.isOn == true)
     }
 
+    /// Spec §6.5: a registration reply of many keys must not displace an
+    /// entity's only signal. Before 0.11.0 the entity filtered on top of
+    /// the shared 64-newest change stream from a forwarding task; when
+    /// that task had not yet started awaiting — a scheduling race at
+    /// subscription — a flood of 200 other changes pushed the entity's
+    /// change out. The race cannot be forced here, so this test states the
+    /// guarantee rather than reproducing the loss.
+    @Test func updateSurvivesAFloodOfOtherKeys() async throws {
+        let (devices, store, _) = try loadBound()
+        guard case .toggle(let toggle) = try entity("w-onoff_0", in: devices) else {
+            Issue.record("expected toggle")
+            return
+        }
+        let stream = toggle.updates()
+
+        // The entity's change first, then 200 changes of keys the store
+        // knows nothing about (fetch-style, includingUnknown) — all before
+        // the consumer gets to run.
+        let own = ValueRef.attribute(cluId: "CLU_501234567", objectName: "DOU8272", index: "0")
+        let others = (0..<200).map { ValueRef.variable(cluId: "CLU_501234567", name: "flood\($0)") }
+        store.updateKeys([own] + others, [.value(.string("ON"))] + others.map { _ in .value(.int(1)) },
+                         includingUnknown: true)
+
+        let signal = await withTaskGroup(of: Bool.self) { group -> Bool in
+            group.addTask { for await _ in stream { return true }; return false }
+            group.addTask { try? await Task.sleep(for: .milliseconds(500)); return false }
+            let first = await group.next() ?? false
+            group.cancelAll()
+            return first
+        }
+        #expect(signal, "the entity's signal was lost under a flood of other keys")
+        #expect(toggle.isOn == true)
+    }
+
     private final class Counter: @unchecked Sendable {
         private let lock = NSLock()
         private var count = 0

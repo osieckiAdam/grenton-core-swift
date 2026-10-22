@@ -20,18 +20,19 @@ targets: [
     .executableTarget(
         name: "MyApp",
         dependencies: [
-            .product(name: "GrentonProvisioning", package: "grenton-core-swift"),
-            .product(name: "GrentonDevices", package: "grenton-core-swift"),
-            .product(name: "GrentonRuntime", package: "grenton-core-swift"),
+            .product(name: "GrentonKit", package: "grenton-core-swift"),
         ]
     ),
 ]
 ```
 
-`GrentonRuntime` holds the types the other two hand you — `SessionState`,
-`SessionError`, `GrentonLogger` — so import it wherever you check a
-state or catch an error. An iOS app also needs two `Info.plist` keys
-before any of this works: see <doc:RunningOnApplePlatforms>.
+`import GrentonKit` brings in every module: the devices (`GrentonDevices`),
+the Object Manager client and project-file import (`GrentonProvisioning`),
+the connection types you check or catch — `SessionState`, `SessionError`,
+`GrentonLogger` (`GrentonRuntime`) — and the interface model
+(`GrentonModel`). Each is also a product of its own for an app that wants
+only some of them. An iOS app also needs two `Info.plist` keys before any
+of this works: see <doc:RunningOnApplePlatforms>.
 
 ### Download the interface
 
@@ -40,7 +41,7 @@ devices**. The dialog shows the computer's IP address, the port and a
 token, the PIN. Keep it open while you download:
 
 ```swift
-import GrentonProvisioning
+import GrentonKit
 
 let client = ProvisioningClient(host: "192.168.1.50")
 let archive = try await client.fetchInterfaceArchive(pin: "149 853")
@@ -65,7 +66,7 @@ let fromProject = try GrentonSystem(interface: project.interface())
 Later runs load the saved archive; no PIN and no Object Manager needed:
 
 ```swift
-import GrentonDevices
+import GrentonKit
 
 let system = try GrentonSystem(
     interfaceArchive: Data(contentsOf: URL(fileURLWithPath: "interface.zip")))
@@ -96,7 +97,8 @@ await system.stop()
 ```
 
 <doc:ConnectionLifecycle> covers what happens between `start()` and
-`stop()`, and the errors a command can throw.
+`stop()`, and the errors a command can throw. <doc:TestingYourApp> shows
+how to test your code against these entities without a CLU.
 
 The repository's `Examples` directory has a complete program for each
 step; each is one `main.swift` meant to be read:

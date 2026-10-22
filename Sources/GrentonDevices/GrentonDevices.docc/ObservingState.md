@@ -32,11 +32,18 @@ for entity in system.entities {
 Buttons, scenes and cameras have no state, so their `updates()` is `nil`.
 
 The stream tells you *that* something changed, not what: read the
-entity. It does not fire for the values known at `start()`, only for later
-changes, so read the state once before you wait. Each call makes a new,
-independent stream; a consumer that falls behind sees the latest changes
-and misses the ones in between, which is harmless because the entity
-always holds the current value.
+entity. Subscribe first, then read the state once, then wait — a change
+between the read and the subscription would otherwise go unseen. The
+stream only fires for changes after the subscription, never for what was
+known before it. Several changes while you are busy may arrive as one
+signal, but a signal is never lost: after every change of the entity's
+values at least one follows, however many other values change meanwhile,
+and the entity already holds the new value when it arrives.
+
+`GrentonSystem.changes()` is different: a stream of every value change of
+every CLU, for logging. It keeps the newest 64 when a consumer falls
+behind and promises no complete history; the entities' `updates()` are
+the way to show state.
 
 ### Read values once
 
@@ -57,7 +64,7 @@ A slot is `failed` when the CLU did not answer in time.
 ### When values are unknown
 
 A value is `nil` until its CLU reports it. If every value stays `nil`,
-check ``GrentonSystem/sessionStates()``: a CLU that never answered is
-`SessionState.degraded`. On a Mac, the app running your
+check ``GrentonSystem/diagnostics()``: a CLU that never answered is
+`SessionState.degraded` with no reply time (see <doc:ConnectionLifecycle>). On a Mac, the app running your
 code needs access to the local network (System Settings, Privacy &
 Security, Local Network).

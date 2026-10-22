@@ -28,6 +28,32 @@ for (cluId, state) in states where state != .ready {
 
 Calling `start()` twice does nothing the second time.
 
+### Telling the user how the house answers
+
+``GrentonSystem/diagnostics()`` describes each CLU connection: its
+state, how long ago the CLU last answered a request and last pushed a
+report, how long the last ping took, how many keys are subscribed, whether
+they wait to be subscribed again, and how many pings in a row went
+unanswered. Every CLU of the interface is listed, as `idle` before
+`start()`. It sends nothing and is cheap to call from a timer:
+
+```swift
+for (cluId, health) in await system.diagnostics() {
+    switch health.state {
+    case .ready:
+        print("CLU \(cluId) answered \(health.sinceLastReply ?? .zero) ago, ping \(health.lastPingRoundTrip ?? .zero)")
+    case .degraded:
+        print("CLU \(cluId) silent for \(health.consecutivePingTimeouts) pings")
+    default:
+        print("CLU \(cluId) is \(health.state)")
+    }
+}
+```
+
+Each entry is one consistent view of one CLU; the dictionary is not one
+instant of the whole installation. The times restart with every
+`start()`, and `stop()` clears them.
+
 ### Staying connected
 
 Every five seconds the library pings each CLU, and every thirty seconds it

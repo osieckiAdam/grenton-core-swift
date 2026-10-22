@@ -16,11 +16,12 @@ catch its errors, or to supply your own transport.
 
 - ``GrentonLogger``
 - ``SessionState``
+- ``SessionDiagnostics``
 
 ### State
 
 - ``StateChange``
-- ``RegistrationSlot``
+- ``ValueSlot``
 
 ### Sessions and Transport
 

@@ -1,7 +1,5 @@
 import Foundation
-import GrentonProvisioning
-import GrentonRuntime
-import GrentonDevices
+import GrentonKit
 
 /// Example: turn a switch or light on or off and confirm the CLU applied it.
 ///

@@ -33,6 +33,16 @@ extension Clock where Duration == Swift.Duration {
         now.advanced(by: duration)
     }
 
+    /// How much time passed since an instant made by `deadline(after:)` or
+    /// `instant()` on this clock.
+    func elapsed(since instant: any Sendable) -> Duration? {
+        guard let instant = instant as? Instant else { return nil }
+        return instant.duration(to: now)
+    }
+
+    /// `now`, opaque, for `elapsed(since:)`.
+    func instant() -> any Sendable { now }
+
     /// Sleeps until a deadline made by `deadline(after:)` on this clock; a
     /// deadline already past returns at once.
     func sleep(untilDeadline deadline: any Sendable) async throws {
@@ -88,6 +98,27 @@ public actor CluSession {
     /// the last reply; the third one retires the socket (spec §5.4.5).
     private var consecutivePingTimeouts = 0
     private static let pingTimeoutsBeforeReplacing = 3
+
+    // MARK: Diagnostics (spec §5.4.5)
+
+    /// When the last reply matched a pending request on a current socket.
+    private var lastReplyAt: (any Sendable)?
+    /// When the last notification was accepted and published.
+    private var lastReportAt: (any Sendable)?
+    private var lastPingRoundTrip: Duration?
+
+    /// One consistent observation of this connection (spec §5.4.5). Sends
+    /// nothing and waits for nothing but the actor.
+    public var diagnostics: SessionDiagnostics {
+        SessionDiagnostics(
+            state: state,
+            sinceLastReply: lastReplyAt.flatMap { clock.elapsed(since: $0) },
+            sinceLastReport: lastReportAt.flatMap { clock.elapsed(since: $0) },
+            lastPingRoundTrip: lastPingRoundTrip,
+            requestedKeyCount: desiredKeys.count,
+            recoveryPending: needsRecovery,
+            consecutivePingTimeouts: consecutivePingTimeouts)
+    }
 
     /// How long after the previous loop ping ends the next one is sent (spec §5.4.4).
     public static let defaultPingInterval: Duration = .seconds(5)
@@ -229,6 +260,11 @@ public actor CluSession {
         chunks = []
         subscriptions = [:]
         nextNumber = 1
+        // A new run starts its diagnostics over (spec §5.4.5).
+        lastReplyAt = nil
+        lastReportAt = nil
+        lastPingRoundTrip = nil
+        consecutivePingTimeouts = 0
         _ = await pingInternal(gateHeld: true)
         if state != .stopped { startPingLoop() }
     }
@@ -246,6 +282,10 @@ public actor CluSession {
         state = .stopped
         desiredKeys = []
         needsRecovery = false
+        consecutivePingTimeouts = 0
+        lastReplyAt = nil
+        lastReportAt = nil
+        lastPingRoundTrip = nil
         pingLoopTask?.cancel()
         pingLoopTask = nil
         registerLoopTask?.cancel()
@@ -324,8 +364,10 @@ public actor CluSession {
         // rollover, failure, stop) says nothing about the current one.
         let generation = mainSocketGeneration
         do {
+            let sentAt = clock.instant()
             _ = try await sendRequest(Payloads.checkAlive, msgId: keepAliveId, over: socket)
             guard state != .stopped, generation == mainSocketGeneration else { return false }
+            lastPingRoundTrip = clock.elapsed(since: sentAt)
             consecutivePingTimeouts = 0
             if needsRecovery && !desiredKeys.isEmpty {
                 await recoverSubscriptions(gateHeld: gateHeld)
@@ -433,7 +475,7 @@ public actor CluSession {
     /// number. Returns slots positionally aligned with `keys`; a failed
     /// chunk contributes `.failed` at its positions. A cancelled caller
     /// performs nothing and receives all-failed slots.
-    public func register(_ keys: [ValueRef]) async -> [RegistrationSlot] {
+    public func register(_ keys: [ValueRef]) async -> [ValueSlot] {
         guard await beginOperation() else { return keys.map { _ in .failed } }
         defer { endOperation() }
         // Before start(), or stopped while queued: nothing is sent and the
@@ -460,19 +502,19 @@ public actor CluSession {
     /// leaves the subscriptions and the maintenance loops alone, sends
     /// nothing without an open main socket, and `stop()` cuts it short with
     /// `failed` for what was not read.
-    public func fetch(_ keys: [ValueRef]) async -> [RegistrationSlot] {
+    public func fetch(_ keys: [ValueRef]) async -> [ValueSlot] {
         guard await beginOperation() else { return keys.map { _ in .failed } }
         defer { endOperation() }
         guard state != .stopped, mainSocket != nil else { return keys.map { _ in .failed } }
-        var results: [RegistrationSlot] = []
+        var results: [ValueSlot] = []
         for chunk in Payloads.fetchChunks(keys, frameLimit: registerFrameLimit) {
             results += await fetchChunk(chunk)
         }
         return results
     }
 
-    private func fetchChunk(_ keys: [ValueRef]) async -> [RegistrationSlot] {
-        let failed = keys.map { _ in RegistrationSlot.failed }
+    private func fetchChunk(_ keys: [ValueRef]) async -> [ValueSlot] {
+        let failed = keys.map { _ in ValueSlot.failed }
         guard state != .stopped, let socket = mainSocket else { return failed }
         do {
             let payload = try Payloads.fetchValues(keys: keys)
@@ -481,7 +523,7 @@ public actor CluSession {
                 logger.error("[\(clu.name)] Malformed fetchValues response")
                 return failed
             }
-            return values.map(RegistrationSlot.value)
+            return values.map(ValueSlot.value)
         } catch is CancellationError {
             return failed
         } catch {
@@ -546,7 +588,7 @@ public actor CluSession {
     /// Body of `register` — requires the operation gate to be held. With
     /// `publishingChunks` (loop renewal and recovery) every answered chunk
     /// reaches the report path as soon as it is answered (spec §5.4.3–§5.4.4).
-    private func registerLocked(_ keys: [ValueRef], publishingChunks: Bool = false) async -> [RegistrationSlot] {
+    private func registerLocked(_ keys: [ValueRef], publishingChunks: Bool = false) async -> [ValueSlot] {
         reregistrationDeadline = nil
         guard state != .stopped else { return keys.map { _ in .failed } }
         guard !keys.isEmpty else {
@@ -573,7 +615,7 @@ public actor CluSession {
         // once, the two CLUs that need 4–5 chunks timed out on some of them
         // in every live run, while single-chunk CLUs never did; sequential
         // registration removed every timeout (live, 2026-09-30).
-        var results: [RegistrationSlot] = []
+        var results: [ValueSlot] = []
         for chunk in plan {
             let slots = await registerChunk(chunk)
             results += slots
@@ -589,8 +631,8 @@ public actor CluSession {
         return results
     }
 
-    private func registerChunk(_ chunk: Chunk) async -> [RegistrationSlot] {
-        let failed = chunk.keys.map { _ in RegistrationSlot.failed }
+    private func registerChunk(_ chunk: Chunk) async -> [ValueSlot] {
+        let failed = chunk.keys.map { _ in ValueSlot.failed }
         guard state != .stopped, let socket = mainSocket else { return failed }
         // Remembered from the moment it is sent: the CLU may accept it even
         // when the reply is lost (spec §5.4.2 pt 2).
@@ -609,7 +651,7 @@ public actor CluSession {
                 logger.error("[\(clu.name)] Malformed register response (subscription \(chunk.number))")
                 return failed
             }
-            return report.values.map(RegistrationSlot.value)
+            return report.values.map(ValueSlot.value)
         } catch is CancellationError {
             return failed   // stop() cancelled it — not a CLU failure
         } catch {
@@ -873,6 +915,7 @@ public actor CluSession {
         logger.debug("[\(clu.name)][\(response.msgId)] Received: \(text)")
 
         if let entry = pending.removeValue(forKey: response.msgId) {
+            lastReplyAt = clock.instant()
             entry.continuation.resume(returning: response)
             return
         }
@@ -887,7 +930,8 @@ public actor CluSession {
                 logger.debug("[\(clu.name)] Dropping a report for an unknown subscription or with a wrong value count")
                 return
             }
-            publishReport(ChunkReport(keys: keys, slots: report.values.map(RegistrationSlot.value)))
+            lastReportAt = clock.instant()
+            publishReport(ChunkReport(keys: keys, slots: report.values.map(ValueSlot.value)))
         } else {
             logger.debug("[\(clu.name)][\(response.msgId)] Response with no pending request")
         }
