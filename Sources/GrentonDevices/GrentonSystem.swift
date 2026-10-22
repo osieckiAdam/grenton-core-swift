@@ -52,7 +52,7 @@ final class ExecutorProxy: CommandExecuting, @unchecked Sendable {
 public actor GrentonSystem: CommandExecuting {
     /// Every value reported by the CLUs. Entities read their state from it;
     /// use it directly only for raw values.
-    public nonisolated let store: StateStore
+    package nonisolated let store: StateStore
     /// The devices as plain descriptions, without state or commands.
     public nonisolated let descriptors: [DeviceDescriptor]
     /// Every device of the interface, one per widget, in page order.
@@ -159,6 +159,22 @@ public actor GrentonSystem: CommandExecuting {
     /// Every entity of every device, in device order.
     public nonisolated var entities: [BoundEntity] {
         devices.flatMap(\.entities)
+    }
+
+    /// The last value a CLU reported for `ref`, raw; `nil` until reported.
+    ///
+    /// Entities present these values normalized; read them here for a key no
+    /// entity covers, for example one read with ``fetch(_:)``.
+    public nonisolated func value(for ref: ValueRef) -> GrentonValue? {
+        store.value(for: ref)
+    }
+
+    /// Every value change of every CLU, as it happens.
+    ///
+    /// Each call makes a new stream; one that falls behind drops the oldest
+    /// changes, and ``value(for:)`` always has the current value.
+    public nonisolated func changes() -> AsyncStream<StateChange> {
+        store.changes()
     }
 
     // MARK: - Lifecycle
@@ -293,7 +309,7 @@ public actor GrentonSystem: CommandExecuting {
     /// `refs`; a position is `failed` when its CLU did not answer or is not
     /// part of this system. Values that were read are stored and announced
     /// like a report — also for keys no entity watches, which stay readable
-    /// through ``store`` without becoming a subscription. A read that
+    /// through ``value(for:)`` without becoming a subscription. A read that
     /// arrives after a newer report of the same key can briefly show the
     /// older value; the next report corrects it.
     public func fetch(_ refs: [ValueRef]) async -> [RegistrationSlot] {

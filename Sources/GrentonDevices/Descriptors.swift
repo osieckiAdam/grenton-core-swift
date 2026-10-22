@@ -8,7 +8,7 @@ import GrentonModel
 /// A device as plain data: one widget of the interface, without state or commands.
 ///
 /// ``DeviceMapper`` makes these from an interface with no network access, which is enough to list an installation's devices.
-public struct DeviceDescriptor: Sendable {
+public struct DeviceDescriptor: Identifiable, Sendable {
     // The widget id.
     /// The widget id, stable across restarts.
     public let id: String
@@ -73,8 +73,8 @@ public enum DeviceKind: String, Sendable, CaseIterable {
     case thermostat
 }
 
-/// An entity as plain data: what it reads and which actions it sends. ``DeviceBinder`` turns it into a live ``BoundEntity``.
-public enum EntityDescriptor: Sendable {
+/// An entity as plain data: what it reads and which actions it sends. `GrentonSystem` turns it into a live ``BoundEntity``.
+public enum EntityDescriptor: Identifiable, Sendable {
     case toggle(ToggleDescriptor)
     case dimmableLight(DimmableLightDescriptor)
     case hsbLight(HsbLightDescriptor)
@@ -216,17 +216,34 @@ public struct DimmableLightDescriptor: Sendable {
 }
 
 // One HSB channel: where to read it, how to set it, the device range.
-/// One channel of a colour light (hue, saturation or brightness): where to read it, how to set it, and the device's range.
+/// The range a device uses for one channel, such as 0…255 for brightness.
+public struct ChannelRange: Equatable, Sendable {
+    /// The lowest device value.
+    public let min: Double
+    /// The highest device value.
+    public let max: Double
+
+    /// Creates a range.
+    public init(min: Double, max: Double) {
+        self.min = min
+        self.max = max
+    }
+
+    package var tuple: (min: Double, max: Double) { (min, max) }
+}
+
+/// One channel of an RGB light — hue, saturation or brightness — with the
+/// value it reads, the action that sets it and the device's range for it.
 public struct HsbChannelDescriptor: Sendable {
     /// The CLU value the entity reads.
     public let state: ValueRef
     /// The action that sets this value; its value is replaced when sent.
     public let setAction: ActionRef
     /// The device's range for this channel.
-    public let range: (min: Double, max: Double)
+    public let range: ChannelRange
 
     /// Creates a channel.
-    public init(state: ValueRef, setAction: ActionRef, range: (min: Double, max: Double)) {
+    public init(state: ValueRef, setAction: ActionRef, range: ChannelRange) {
         self.state = state
         self.setAction = setAction
         self.range = range
@@ -506,7 +523,9 @@ public struct ObjectKey: Hashable, Sendable {
 /// One piece of hardware on a CLU and every widget that shows it.
 ///
 /// Get the list from ``GrentonSystem/physicalObjects``.
-public struct PhysicalObject: Sendable {
+public struct PhysicalObject: Identifiable, Sendable {
+    /// The object's key, which identifies it.
+    public var id: ObjectKey { key }
     // A widget's view of the object: which device, where, and which of
     // its entities belong to this object.
     /// One widget showing the object.

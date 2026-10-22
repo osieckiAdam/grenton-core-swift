@@ -82,7 +82,7 @@ import GrentonRuntime
         let t = try thermostat("t_0", in: devices)
         #expect(devices.first?.descriptor.kind == .thermostat)
         #expect(t.supportsMode && t.supportsPower)
-        #expect(t.currentTemperature == nil && t.mode == nil && t.isOn == nil)
+        #expect(t.currentTemperature == nil && t.mode == nil && t.isActive == nil)
 
         func attr(_ index: String) -> ValueRef { .attribute(cluId: Self.clu, objectName: "THE1001", index: index) }
         store.updateKeys(
@@ -93,7 +93,7 @@ import GrentonRuntime
         #expect(t.targetTemperature == 22)
         #expect(t.minTemperature == 8 && t.maxTemperature == 28)
         #expect(t.mode == .schedule)
-        #expect(t.isOn == true)
+        #expect(t.isActive == true)
         #expect(t.output == 1)
 
         store.updateKeys([attr("8")], [.value(.int(7))])
@@ -117,10 +117,10 @@ import GrentonRuntime
         #expect(executor.lastValue == "0")
         try await t.setMode(.holiday)
         #expect(executor.lastValue == "1")
-        try await t.turnOff()
+        try await t.setActive(false)
         #expect(executor.lastValue == "0")
         #expect(executor.actions.last?.call == .attribute(index: "6"))
-        try await t.turnOn()
+        try await t.setActive(true)
         #expect(executor.lastValue == "1")
         #expect(!executor.actions.contains { $0.value == "$value$" })
     }
@@ -130,7 +130,7 @@ import GrentonRuntime
         let t = try thermostat("t-min_0", in: devices)
         #expect(!t.supportsMode && !t.supportsPower)
         try await t.setMode(.schedule)
-        try await t.turnOn()
+        try await t.setActive(true)
         #expect(executor.actions.isEmpty)   // no-ops, like Cover.stop()
     }
 }

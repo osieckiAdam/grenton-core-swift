@@ -6,8 +6,9 @@ The encrypted UDP connection to the CLU controllers.
 
 Most apps never use this module directly: `GrentonSystem`
 runs one ``CluSession`` per CLU, keeps the subscriptions alive and stores
-every value in a ``StateStore``. Reach for GrentonRuntime to log what the
-library does, to read raw values, or to supply your own transport.
+every value; `GrentonSystem.value(for:)` and `GrentonSystem.changes()`
+read them. Reach for GrentonRuntime to log what the library does, to
+catch its errors, or to supply your own transport.
 
 ## Topics
 
@@ -18,8 +19,8 @@ library does, to read raw values, or to supply your own transport.
 
 ### State
 
-- ``StateStore``
 - ``StateChange``
+- ``RegistrationSlot``
 
 ### Sessions and Transport
 

@@ -34,9 +34,9 @@ Use them to store your own settings per entity.
 Entities hide how a device encodes its state: a switch is on or off, a
 dimmer's brightness runs from 0 to 1, a shutter's position from 0 (closed)
 to 100 (open), whatever the device reports internally. Values are `nil`
-until the CLU has reported them. The one exception is ``SensorEntity``,
-whose `value` is the reported `GrentonValue` itself, with the unit and
-precision of its descriptor to present it.
+until the CLU has reported them. A ``SensorEntity`` gives its reading as
+a `number` with a `unit` to show, and keeps the reported `value` for the
+sensors that report text.
 
 | Entity | Property | Type and range |
 |---|---|---|
@@ -47,7 +47,7 @@ precision of its descriptor to present it.
 | ``ThermostatEntity`` | `currentTemperature`, `targetTemperature` | `Double`, °C |
 | ``NumberSettingEntity`` | `value` | `Double` in the widget's range |
 | ``ContactSensorEntity``, ``StateSensorEntity`` | `isOn` / `state` | `Bool` / `GrentonValue` |
-| ``SensorEntity`` | `value` | `GrentonValue`, see `SensorDescriptor` |
+| ``SensorEntity`` | `number`, `unit`, `value` | `Double?` with `String?`, and the raw `GrentonValue` |
 
 ### Physical objects
 

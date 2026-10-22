@@ -40,8 +40,10 @@ if case .thermostat(let thermostat) = entity {
 
 The target is clamped to the thermostat's own minimum and maximum. Not
 every thermostat exposes a mode or a power switch; `setMode` and
-`turnOn`/`turnOff` do nothing when ``ThermostatEntity/supportsMode`` or
-``ThermostatEntity/supportsPower`` is `false`.
+`setActive` do nothing when ``ThermostatEntity/supportsMode`` or
+``ThermostatEntity/supportsPower`` is `false`. A thermostat is not a
+light: ``ThermostatEntity/isActive`` says whether it controls the heating,
+and ``BoundEntity/switchable`` leaves thermostats out on purpose.
 
 ### Shutters
 

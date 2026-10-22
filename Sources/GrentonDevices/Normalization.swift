@@ -7,7 +7,7 @@ import GrentonModel
 
 // `mapRange((a,b) → (c,d), v)` — no clamping (spec: callers clamp inputs).
 /// Maps a value from one range to another, without clamping.
-public func mapRange(
+package func mapRange(
     from source: (min: Double, max: Double),
     to target: (min: Double, max: Double),
     value: Double
@@ -19,7 +19,7 @@ public func mapRange(
 }
 
 /// Limits a value to a range.
-public func clamp(_ value: Double, to range: ClosedRange<Double>) -> Double {
+package func clamp(_ value: Double, to range: ClosedRange<Double>) -> Double {
     min(max(value, range.lowerBound), range.upperBound)
 }
 
@@ -27,7 +27,7 @@ public func clamp(_ value: Double, to range: ClosedRange<Double>) -> Double {
 // the number 1. The reference's `value == True` holds for 1 and 1.0 in
 // Python, and relays report their state as 0/1.
 /// Reads a switch state: on for the text `"ON"`, `true`, or the number 1; `nil` while unknown.
-public func boolFromOnOff(_ value: GrentonValue?) -> Bool? {
+package func boolFromOnOff(_ value: GrentonValue?) -> Bool? {
     guard let value else { return nil }
     switch value {
     case .string(let s): return s == "ON"
@@ -40,7 +40,7 @@ public func boolFromOnOff(_ value: GrentonValue?) -> Bool? {
 
 // Python-style truthiness (spec §6.2) for binary sensors and LED power.
 /// Reads a value as on or off the way sensors and LEDs report it: zero, empty text and `false` are off; `nil` while unknown.
-public func truthy(_ value: GrentonValue?) -> Bool? {
+package func truthy(_ value: GrentonValue?) -> Bool? {
     guard let value else { return nil }
     switch value {
     case .null: return nil
@@ -52,7 +52,7 @@ public func truthy(_ value: GrentonValue?) -> Bool? {
 }
 
 /// The value as a number, if it is an integer or a decimal.
-public func asDouble(_ value: GrentonValue?) -> Double? {
+package func asDouble(_ value: GrentonValue?) -> Double? {
     switch value {
     case .int(let i): return Double(i)
     case .double(let d): return d
@@ -65,7 +65,7 @@ public func asDouble(_ value: GrentonValue?) -> Double? {
 /// `nil` for a double outside the `Int` range or not finite: the wire can
 /// carry such a number (an integer wider than 64 bits arrives as a double,
 /// spec §3.1 pt 4), and it must not crash the app.
-public func asInt(_ value: GrentonValue?) -> Int? {
+package func asInt(_ value: GrentonValue?) -> Int? {
     switch value {
     case .int(let i): return Int(i)
     case .double(let d): return d.isFinite ? Int(exactly: d.rounded(.towardZero)) : nil

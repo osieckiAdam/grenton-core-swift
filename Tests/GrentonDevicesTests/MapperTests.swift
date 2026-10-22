@@ -62,9 +62,9 @@ import GrentonModel
             Issue.record("expected hsbLight")
             return
         }
-        #expect(led.hue.range == (0, 360))
-        #expect(led.saturation.range == (0, 100))
-        #expect(led.brightness.range == (0, 255))
+        #expect(led.hue.range == ChannelRange(min: 0, max: 360))
+        #expect(led.saturation.range == ChannelRange(min: 0, max: 100))
+        #expect(led.brightness.range == ChannelRange(min: 0, max: 255))
         #expect(led.onAction.event == .on)
     }
 

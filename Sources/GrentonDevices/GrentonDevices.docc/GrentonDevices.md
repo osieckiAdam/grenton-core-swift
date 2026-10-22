@@ -67,6 +67,7 @@ no PIN.
 
 - ``PhysicalObject``
 - ``ObjectKey``
+- ``ChannelRange``
 
 ### Devices Without a Connection
 

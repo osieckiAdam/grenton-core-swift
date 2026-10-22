@@ -23,7 +23,7 @@ func validateTypeLiteral(
     }
 }
 
-public enum TypeLiteralKey: String, CodingKey {
+package enum TypeLiteralKey: String, CodingKey {
     case type
 }
 

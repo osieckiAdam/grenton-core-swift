@@ -91,6 +91,9 @@ public actor CluSession {
 
     /// How long after the previous loop ping ends the next one is sent (spec §5.4.4).
     public static let defaultPingInterval: Duration = .seconds(5)
+    /// The default limit of a registration frame in UTF-8 bytes (spec §5.3.2):
+    /// one IP packet at MTU 1500.
+    public static let defaultRegisterFrameLimit = 1471
     /// How long after a registration starts the keys are registered again (spec §5.4.4).
     public static let defaultRegisterInterval: Duration = .seconds(30)
 
@@ -176,7 +179,7 @@ public actor CluSession {
         responseTimeout: Duration = .seconds(5),
         pingInterval: Duration = CluSession.defaultPingInterval,
         registerInterval: Duration = CluSession.defaultRegisterInterval,
-        registerFrameLimit: Int = Payloads.defaultRegisterFrameLimit
+        registerFrameLimit: Int = CluSession.defaultRegisterFrameLimit
     ) {
         self.clu = clu
         self.cipher = cipher

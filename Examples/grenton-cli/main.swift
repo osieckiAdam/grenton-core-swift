@@ -200,7 +200,7 @@ do {
 
     if watchSeconds > 0 {
         print("\n→ connecting to CLUs (\(anySource ? "any-source" : "connected")), watching for \(watchSeconds)s …")
-        let changes = system.store.changes()
+        let changes = system.changes()
         let interruptHandler = stopOnInterrupt(system)
         await system.start()
         print("✓ sessions: \(await system.sessionStates())")
@@ -223,7 +223,7 @@ do {
                 print("  thermostat \(id) (\(thermostat.name)): current \(show(thermostat.currentTemperature)) °C, "
                       + "target \(show(thermostat.targetTemperature)) °C, "
                       + "range \(show(thermostat.minTemperature))…\(show(thermostat.maxTemperature)), "
-                      + "mode \(thermostat.mode.map { "\($0)" } ?? "?"), running \(thermostat.isOn.map { "\($0)" } ?? "?")")
+                      + "mode \(thermostat.mode.map { "\($0)" } ?? "?"), active \(thermostat.isActive.map { "\($0)" } ?? "?")")
                 do {
                     try await thermostat.setTargetTemperature(celsius)
                     print("  ✓ set point of \(id) sent: \(celsius) °C — restore with --set-temperature \(id)=\(show(thermostat.targetTemperature))")

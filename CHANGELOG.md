@@ -5,6 +5,15 @@ Versions follow the specification the port implements; see README,
 
 ## Unreleased
 
+- API surface before 1.0: the helpers and plumbing an app never needed are
+  `package` (`mapRange`, `clamp`, `asInt`…, `DeviceContext`, `DeviceBinder`,
+  `CommandExecuting`, `StateStore`, `Payloads`, `WireFrame`); the system
+  offers `value(for:)` and `changes()` instead of its store.
+  `BoundDevice`, `BoundEntity`, `DeviceDescriptor`, `EntityDescriptor` and
+  `PhysicalObject` are `Identifiable` (entities and devices `Hashable` by
+  id); an HSB channel's range is a `ChannelRange` instead of a tuple.
+  `SensorEntity` gains `number` and `unit`. The thermostat's `isOn`,
+  `turnOn()` and `turnOff()` are `isActive` and `setActive(_:)`.
 - Follows spec 0.10.1 (suite 0.10.1, 232 cases). The `.omp` import converts
   every widget type of the mobile interface — `CAMERA`, `LED`,
   `CONTACT_SENSOR`, `CONTACT_SENSOR_DOUBLE`, `SLIDER`, `MULTISENSOR`, the

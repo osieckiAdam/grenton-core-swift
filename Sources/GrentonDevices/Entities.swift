@@ -4,20 +4,20 @@ import GrentonRuntime
 
 /// Command boundary the entities execute through — `GrentonSystem` (or a
 /// test mock) provides it by routing to the right CLU session.
-public protocol CommandExecuting: Sendable {
+package protocol CommandExecuting: Sendable {
     func execute(_ action: ActionRef) async throws
 }
 
 /// Everything a live entity needs: synchronous state reads and command
 /// execution. Value type — cheap to hand to every entity.
-public struct DeviceContext: Sendable {
+package struct DeviceContext: Sendable {
     /// Where entities read their state.
-    public let store: StateStore
+    package let store: StateStore
     /// Where entities send their commands.
-    public let executor: any CommandExecuting
+    package let executor: any CommandExecuting
 
     /// Creates a context from a store and a command executor.
-    public init(store: StateStore, executor: any CommandExecuting) {
+    package init(store: StateStore, executor: any CommandExecuting) {
         self.store = store
         self.executor = executor
     }
@@ -58,6 +58,13 @@ public struct BoundDevice: Sendable {
     /// The things you read and control, such as the two relays of a double
     /// switch.
     public let entities: [BoundEntity]
+}
+
+extension BoundDevice: Identifiable, Hashable {
+    /// The widget id; the same as ``DeviceDescriptor/id``.
+    public var id: String { descriptor.id }
+    public static func == (lhs: BoundDevice, rhs: BoundDevice) -> Bool { lhs.id == rhs.id }
+    public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 /// A live entity: something you read or control, such as a light, a
@@ -170,9 +177,9 @@ extension SwitchableEntity {
 
 /// Builds live devices from descriptors. ``GrentonSystem`` does this for
 /// you; use it only to run devices on your own store and command executor.
-public enum DeviceBinder {
+package enum DeviceBinder {
     /// Turns descriptors into live devices, registering every value they read in the store.
-    public static func bind(
+    package static func bind(
         _ descriptors: [DeviceDescriptor], context: DeviceContext
     ) -> [BoundDevice] {
         descriptors.map { descriptor in
@@ -308,7 +315,7 @@ public final class HsbLightEntity: Sendable {
         // Clamp reads to the canonical range (Δ vs the reference): the
         // state contract holds even when the CLU reports out of range.
         return clamp(
-            mapRange(from: channel.range, to: canonical, value: raw),
+            mapRange(from: channel.range.tuple, to: canonical, value: raw),
             to: canonical.0...canonical.1)
     }
 
@@ -337,7 +344,7 @@ public final class HsbLightEntity: Sendable {
     private func setChannel(
         _ channel: HsbChannelDescriptor, canonical: (Double, Double), value: Double
     ) async throws {
-        let deviceValue = mapRange(from: canonical, to: channel.range, value: value)
+        let deviceValue = mapRange(from: canonical, to: channel.range.tuple, value: value)
         let action = channel.setAction.withValue(formatDeviceNumber(deviceValue, precision: 2))
         try await context.executor.execute(action)
     }
@@ -393,6 +400,21 @@ public final class SensorEntity: Sendable {
     /// Use the descriptor's unit and precision to present it.
     public var value: GrentonValue? {
         context.store.value(for: descriptor.state)
+    }
+
+    /// The reported value as a number; `nil` until reported, or when the CLU sent text or a flag.
+    public var number: Double? {
+        asDouble(value)
+    }
+
+    /// The unit to show next to ``number``: the measured quantity's own (`"°C"`, `"ppm"`, `"lx"`…) or the widget's (`"%"` or `"°"`); `nil` when the interface gives none.
+    public var unit: String? {
+        if let canonical = descriptor.kind.canonicalUnit { return canonical }
+        switch descriptor.grentonUnit {
+        case .percent?: return "%"
+        case .degree?: return "°"
+        case .unknown?, nil: return nil
+        }
     }
 
     /// A stream that fires whenever the state changes.
@@ -686,7 +708,9 @@ public final class ThermostatEntity: Sendable {
 
     // Running (State 1) vs stopped (State 0); `nil` while unknown.
     /// Whether the thermostat controls its output (heating or cooling); `nil` until reported, or when the interface does not expose it.
-    public var isOn: Bool? {
+    ///
+    /// Not "on" like a light: an inactive thermostat still measures, it just stops heating or cooling.
+    public var isActive: Bool? {
         descriptor.power.flatMap { truthy(context.store.value(for: $0.state)) }
     }
 
@@ -699,7 +723,7 @@ public final class ThermostatEntity: Sendable {
 
     /// Whether ``setMode(_:)`` has an effect.
     public var supportsMode: Bool { descriptor.mode != nil }
-    /// Whether ``turnOn()`` and ``turnOff()`` have an effect.
+    /// Whether ``setActive(_:)`` has an effect.
     public var supportsPower: Bool { descriptor.power != nil }
 
     // Writes the manual set point, clamped to the live min/max when both
@@ -722,14 +746,10 @@ public final class ThermostatEntity: Sendable {
         try await context.executor.execute(control.setAction.withValue("\(mode.rawValue)"))
     }
 
-    /// Starts controlling the output. Does nothing when ``supportsPower`` is `false`.
-    public func turnOn() async throws { try await setPower(true) }
-    /// Stops controlling the output, so the thermostat no longer heats or cools. Does nothing when ``supportsPower`` is `false`.
-    public func turnOff() async throws { try await setPower(false) }
-
-    private func setPower(_ on: Bool) async throws {
+    /// Starts (`true`) or stops (`false`) controlling the output; stopped, the thermostat no longer heats or cools. Does nothing when ``supportsPower`` is `false`.
+    public func setActive(_ active: Bool) async throws {
         guard let control = descriptor.power else { return }
-        try await context.executor.execute(control.setAction.withValue(on ? "1" : "0"))
+        try await context.executor.execute(control.setAction.withValue(active ? "1" : "0"))
     }
 
     /// A stream that fires whenever the state changes.
@@ -792,3 +812,8 @@ extension ThermostatEntity: GrentonEntity {
 extension ToggleEntity: SwitchableEntity {}
 extension DimmableLightEntity: SwitchableEntity {}
 extension HsbLightEntity: SwitchableEntity {}
+
+extension BoundEntity: Identifiable, Hashable {
+    public static func == (lhs: BoundEntity, rhs: BoundEntity) -> Bool { lhs.id == rhs.id }
+    public func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}

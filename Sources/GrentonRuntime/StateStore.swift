@@ -20,18 +20,18 @@ public struct StateChange: Sendable, Equatable {
 /// Every value reported by the CLUs.
 ///
 /// Entities read their state from here, already normalized; read the store directly only for raw values.
-public final class StateStore: @unchecked Sendable {
+package final class StateStore: @unchecked Sendable {
     private let lock = NSLock()
     private var values: [ValueRef: GrentonValue] = [:]
     private var known: Set<ValueRef> = []
     private var order: [String: [ValueRef]] = [:]
     private var subscribers: [UUID: AsyncStream<StateChange>.Continuation] = [:]
 
-    public init() {}
+    package init() {}
 
     /// Idempotent; preserves first-registration order per CLU — the order
     /// is part of the protocol (positional value matching).
-    public func registerKey(_ ref: ValueRef) {
+    package func registerKey(_ ref: ValueRef) {
         lock.lock()
         defer { lock.unlock() }
         if known.insert(ref).inserted {
@@ -39,13 +39,13 @@ public final class StateStore: @unchecked Sendable {
         }
     }
 
-    public func subscriptionOrder(cluId: String) -> [ValueRef] {
+    package func subscriptionOrder(cluId: String) -> [ValueRef] {
         lock.lock()
         defer { lock.unlock() }
         return order[cluId] ?? []
     }
 
-    public var cluIdsWithKeys: [String] {
+    package var cluIdsWithKeys: [String] {
         lock.lock()
         defer { lock.unlock() }
         return order.filter { !$0.value.isEmpty }.map(\.key)
@@ -53,7 +53,7 @@ public final class StateStore: @unchecked Sendable {
 
     // `nil` = value not yet known; `.null` = the CLU reported `nil`.
     /// The raw value; `nil` until the CLU has reported it. A CLU reporting nothing gives `GrentonValue.null`.
-    public func value(for ref: ValueRef) -> GrentonValue? {
+    package func value(for ref: ValueRef) -> GrentonValue? {
         lock.lock()
         defer { lock.unlock() }
         return values[ref]
@@ -64,7 +64,7 @@ public final class StateStore: @unchecked Sendable {
     /// never registered are ignored, mirroring the reference, unless
     /// `includingUnknown` is set: a one-shot read (`fetch`, spec §5.4.2)
     /// stores and announces them without making them a subscription.
-    public func updateKeys(_ keys: [ValueRef], _ slots: [RegistrationSlot], includingUnknown: Bool = false) {
+    package func updateKeys(_ keys: [ValueRef], _ slots: [RegistrationSlot], includingUnknown: Bool = false) {
         lock.lock()
         defer { lock.unlock() }
         // Yielding stays INSIDE the critical section: commit order and
@@ -89,7 +89,7 @@ public final class StateStore: @unchecked Sendable {
     // (spec §5.5 Δ). Slow subscribers drop oldest events; the current
     // state is always available synchronously via `value(for:)`.
     /// A stream of every value change. It drops the oldest changes when you fall behind; the current value is always readable with ``value(for:)``.
-    public func changes() -> AsyncStream<StateChange> {
+    package func changes() -> AsyncStream<StateChange> {
         AsyncStream(bufferingPolicy: .bufferingNewest(64)) { continuation in
             let id = UUID()
             lock.lock()

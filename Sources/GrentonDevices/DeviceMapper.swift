@@ -354,7 +354,7 @@ public enum DeviceMapper {
             return HsbChannelDescriptor(
                 state: ValueRef(dto: component.state),
                 setAction: action,
-                range: (Double(component.range.min), Double(component.range.max)))
+                range: ChannelRange(min: Double(component.range.min), max: Double(component.range.max)))
         }
         guard let hueChannel = channel(hue),
               let saturationChannel = channel(saturation),

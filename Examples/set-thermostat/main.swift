@@ -45,7 +45,7 @@ print("\(objectName) is shown as: "
 func describe() -> String {
     func celsius(_ value: Double?) -> String { value.map { "\($0) °C" } ?? "?" }
     return "current \(celsius(thermostat.currentTemperature)), target \(celsius(thermostat.targetTemperature)), "
-        + "mode \(thermostat.mode.map { "\($0)" } ?? "?"), running \(thermostat.isOn.map { "\($0)" } ?? "?")"
+        + "mode \(thermostat.mode.map { "\($0)" } ?? "?"), active \(thermostat.isActive.map { "\($0)" } ?? "?")"
 }
 
 func waitUntil(seconds: Double, _ condition: () -> Bool) async throws -> Bool {

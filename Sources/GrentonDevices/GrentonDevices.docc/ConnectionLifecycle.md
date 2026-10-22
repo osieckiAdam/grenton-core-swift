@@ -70,7 +70,7 @@ Every call that talks to a CLU or to Object Manager throws one of these:
 A command that returns without throwing was received by the CLU; the new
 state arrives as a report a moment later. Commands an entity cannot
 perform on its hardware — `stop()` on a shutter without a stop action,
-`setMode` on a thermostat without a mode — return without doing anything;
+`setMode` or `setActive` on a thermostat without them — return without doing anything;
 check ``CoverEntity/supportsStop``, ``CoverEntity/supportsTilt``,
 ``ThermostatEntity/supportsMode`` and ``ThermostatEntity/supportsPower``
 before offering those controls.
