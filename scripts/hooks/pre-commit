@@ -4,4 +4,4 @@ set -e
 cd "$(git rev-parse --show-toplevel)"
 scripts/check-no-installation-data.py --staged
 scripts/check-public-docs.py
-scripts/check-spec-sync.sh
+scripts/check-spec-sync.sh --warn

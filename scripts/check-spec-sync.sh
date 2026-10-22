@@ -7,6 +7,10 @@
 #     points at the same commit (a spec change must reach the port).
 set -e
 cd "$(dirname "$0")/.."
+# `--warn`: a sibling spec checkout ahead of the vendored commit is reported,
+# not fatal — the pre-commit hook uses it, so a spec draft in the sibling
+# does not block unrelated port commits; the push gate stays strict.
+WARN_ONLY=0; [ "$1" = "--warn" ] && WARN_ONLY=1
 # Git runs hooks with GIT_INDEX_FILE & co. set for this repository; they
 # would point the submodule and sibling-repo commands at the wrong index.
 unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_PREFIX
@@ -25,7 +29,8 @@ if [ -d ../grenton-core-spec/.git ]; then
     local_head=$(git -C ../grenton-core-spec rev-parse HEAD)
     vendored_head=$(git -C "$SPEC" rev-parse HEAD)
     if [ "$local_head" != "$vendored_head" ]; then
-        fail "vendored spec is at ${vendored_head%"${vendored_head#???????}"}, ../grenton-core-spec at ${local_head%"${local_head#???????}"} — push the spec, then: git -C $SPEC fetch && git -C $SPEC checkout origin/main"
+        message="vendored spec is at ${vendored_head%"${vendored_head#???????}"}, ../grenton-core-spec at ${local_head%"${local_head#???????}"} — commit and push the spec, then: git -C $SPEC fetch && git -C $SPEC checkout origin/main"
+        if [ "$WARN_ONLY" = 1 ]; then echo "spec sync (warning): $message" >&2; else fail "$message"; fi
     fi
 fi
 echo "spec sync: suite $declared, submodule current"

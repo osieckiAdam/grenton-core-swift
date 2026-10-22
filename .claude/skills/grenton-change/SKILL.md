@@ -35,20 +35,21 @@ When unsure whether the spec describes it, grep `vendor/grenton-core-spec/spec/g
    reference's Python semantics, or `tools/oracles/`. Never take them from a
    port. If an oracle exists for the operation, extend it; `suite.py check`
    re-derives expectations with it.
-3. Bump the versions:
-   - `| **Wersja** |` in the spec header;
-   - `SPEC_VERSION` in `tools/suite.py`;
-   - `SUITE_VERSION` too when cases changed.
-
-   Then run `python3 tools/suite.py manifest`.
-4. Add a `CHANGELOG.md` entry naming the spec version. The evidence (what
-   was observed, why) goes here, not in the spec.
+3. Bump the version: `python3 tools/suite.py bump X.Y.Z` sets it in the
+   spec header, `spec/conformance.md`, `SPEC_VERSION` and `SUITE_VERSION`
+   (spec and suite share one number). Then run `python3 tools/suite.py manifest`.
+4. Add a `CHANGELOG.md` entry headed `## Spec X.Y.Z, suite X.Y.Z — <date>`
+   (`check_versions.py` requires the version in the newest heading), and
+   keep `README.md`'s "Version X.Y.Z contains … N cases in total" current.
+   The evidence (what was observed, why) goes into the CHANGELOG, not the
+   spec; a finding that changes a rule also goes into `docs/decisions.md`.
 5. Commit and push. The hooks check versions, the CHANGELOG, the suite and
    installation data.
 
 ## 3. Port follows (in `grenton-core-swift`)
 
-1. Move the submodule: `git -C vendor/grenton-core-spec fetch && git -C vendor/grenton-core-spec checkout origin/main`.
+1. Move the submodule: `git -C vendor/grenton-core-spec fetch && git -C vendor/grenton-core-spec checkout origin/main`,
+   then `git add vendor/grenton-core-spec` — the gitlink is part of the port commit.
 2. Set `suiteVersion` in `Tests/GrentonConformanceTests/port.json`.
 3. Run `swift test`. Watch the new or changed cases fail, then implement
    until the whole suite passes. Add an operation handler in
@@ -94,8 +95,11 @@ changes the house (switching, heating).
 - DocC with warnings as errors;
 - doc snippets.
 
-Git hooks run the quick part on commit and all of it on push. Never bypass
-them (`--no-verify`); fix the cause.
+Git hooks run the quick part on commit and all of it on push; `scripts/check.sh`
+fails when they are not enabled. Never bypass them (`--no-verify`, `commit -n`,
+another `core.hooksPath`); fix the cause. A spec draft in `../grenton-core-spec`
+only warns at commit time; the push gate requires the spec committed and
+the submodule moved.
 
 ## Always
 

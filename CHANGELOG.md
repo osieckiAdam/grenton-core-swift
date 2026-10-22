@@ -5,6 +5,11 @@ Versions follow the specification the port implements; see README,
 
 ## Unreleased
 
+- Gates: `scripts/check.sh` fails when the git hooks are not enabled or the
+  installation-data gate differs from the spec's copy; that gate also reads
+  a declared `.omp` (`git config grenton.project`), scans ZIP/.omp files
+  and knows the key material; the spec-sync check only warns at commit
+  time. The agent guard also stops `commit -n` and `core.hooksPath`.
 - API surface before 1.0: the helpers and plumbing an app never needed are
   `package` (`mapRange`, `clamp`, `asInt`…, `DeviceContext`, `DeviceBinder`,
   `CommandExecuting`, `StateStore`, `Payloads`, `WireFrame`); the system

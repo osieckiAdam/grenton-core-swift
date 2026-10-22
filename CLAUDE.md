@@ -27,11 +27,13 @@ port, the docs and the examples, and the gates.
 - `Examples/`: library examples.
 - `Examples/grenton-cli`: the smoke tool. It will move to its own repository.
 - `Tests/GrentonConformanceTests`: the conformance runner, with `port.json` declaring the suite version, profiles and skips.
-- `dist/`: git-ignored. It holds the user's saved interface, which contains the CLU encryption key. Never commit it.
+- `dist/`: git-ignored. It holds the user's saved interface, which contains the CLU encryption key, and the logs of live probes. Never commit it.
+- `docs/grenton-core-swift-port.md`: the port plan (maintainers' notes, Polish). Code comments cite it as "Swift plan §…".
 
 ## Rules
 
 - The spec is normative text, not a log (see the skill).
-- No identifiers of the user's real installation in files or commit messages.
+- No identifiers of the user's real installation in files or commit messages. The gate also knows the project file when `git config grenton.project <path.omp>` is set, and scans ZIP/.omp files entry by entry.
+- Commit messages: one imperative sentence naming the change; a port of a spec version starts "Follow spec X.Y.Z: …" and ends with "(suite X.Y.Z)"; then a paragraph on what changed and why.
 - Live runs need Local Network access for the app they run in. On this Mac, Terminal.app has it. VS Code, including its built-in terminal and Claude's session, does not unless it is granted in System Settings → Privacy & Security → Local Network. Writes that change the house need the user's go-ahead.
 - GrentonModel and GrentonRuntime are not docs-gated yet. Much of their public API is plumbing between modules and should become `package` access.

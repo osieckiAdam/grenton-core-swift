@@ -12,6 +12,7 @@ set -e
 cd "$(dirname "$0")/.."
 step() { printf '\n== %s\n' "$1"; }
 
+step "Git hooks";          scripts/check-hooks.sh
 step "Installation data";  scripts/check-no-installation-data.py --all
 step "Public API docs";    scripts/check-public-docs.py
 step "Spec sync";          scripts/check-spec-sync.sh
