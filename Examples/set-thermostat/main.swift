@@ -21,7 +21,7 @@ guard arguments.count == 4, let newTarget = Double(arguments[3]) else {
 }
 let (interfacePath, objectName) = (arguments[1], arguments[2])
 
-// 1. Load the interface saved from Object Manager (grenton-cli --save-interface).
+// 1. Load the interface saved from Object Manager (fetch-interface).
 let archive = try Data(contentsOf: URL(fileURLWithPath: interfacePath))
 let interface = try ProvisioningClient.parseInterfaceArchive(archive)
 // Library warnings and errors (unreachable CLU, timeouts) go to stderr.

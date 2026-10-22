@@ -36,6 +36,8 @@ no PIN.
 
 - <doc:GettingStarted>
 - <doc:Concepts>
+- <doc:RunningOnApplePlatforms>
+- <doc:ConnectionLifecycle>
 - ``GrentonSystem``
 
 ### Working with Devices

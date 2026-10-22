@@ -126,13 +126,17 @@ public struct MobileInterfaceDTO: Decodable, Sendable {
     public let version: Int
     /// The interface name.
     public let name: String
+    /// The icon name Object Manager assigned.
     public let icon: String
+    /// The colour theme chosen in Object Manager.
     public let theme: GrentonTheme
+    /// The AES key and IV every CLU of the installation uses; keep it private.
     public let encryption: EncryptionDTO
     /// Every CLU of the installation.
     public let clus: [CluDTO]
     /// The pages, in order.
     public let pages: [PageDTO]
+    /// Objects that send push notifications through Grenton's cloud; parsed, not used by the library.
     public let pushNotifications: [PushNotificationDTO]
 
     // All widgets across all pages, in page order (spec §6.1: pages are

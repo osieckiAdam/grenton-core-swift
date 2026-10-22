@@ -8,10 +8,15 @@ public struct EncryptionDTO: Decodable, Hashable, Sendable {
     public let iv: String
 }
 
+/// One CLU controller of the installation, as the interface lists it.
 public struct CluDTO: Decodable, Hashable, Sendable {
+    /// The CLU's object name, such as `CLU220000001`; it keys sessions and states.
     public let id: String
+    /// The serial number in decimal, as Object Manager writes it.
     public let serialNumber: String
+    /// The name given in Object Manager.
     public let name: String
+    /// The IPv4 address the CLU listens on.
     public let ip: String
     /// Kept as `Int` to mirror the schema (spec §3.4) — the 1...65535 range
     /// is validated at the UDP endpoint boundary, not in the Model.

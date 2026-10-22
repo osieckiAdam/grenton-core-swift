@@ -59,19 +59,22 @@ targets: [
         .product(name: "GrentonDevices", package: "grenton-core-swift"),
     ]),
 ]</code></pre>
-        <p>Load the interface exported by Object Manager and list your lights:</p>
+        <p>Download the interface once, then start from the saved copy and list your lights:</p>
 <pre><code class="language-swift">import GrentonProvisioning
 import GrentonDevices
 
-let archive = try Data(contentsOf: URL(fileURLWithPath: "interface.zip"))
-let system = try GrentonSystem(interface: ProvisioningClient.parseInterfaceArchive(archive))
+// Once: Object Manager shows the address and the PIN in "Send to mobile devices".
+let archive = try await ProvisioningClient(host: "192.168.1.50").fetchInterfaceArchive(pin: "149 853")
+try archive.write(to: URL(fileURLWithPath: "interface.zip"))
+
+// Every start: from the saved archive, no PIN and no Object Manager.
+let system = try GrentonSystem(interfaceArchive: archive)
 await system.start()
 
 for light in system.entities.compactMap(\.switchable) {
     print(light.name, light.isOn == true ? "on" : "off")
 }</code></pre>
-        <p>No PIN at hand? A project file saved in Object Manager works too: <code>try ProjectFile(data: data).interface()</code> gives the same interface.</p>
-        <p><a href="api/documentation/grentondevices/gettingstarted/">Using the library →</a></p>
+        <p>The project file saved in Object Manager (<code>.omp</code>) is an alternative to the download. The code above, and loading from a project file, are explained step by step in <a href="api/documentation/grentondevices/gettingstarted/">Using the library →</a></p>
       </div>
 
       <div class="panel" id="tab-source" role="tabpanel" hidden>

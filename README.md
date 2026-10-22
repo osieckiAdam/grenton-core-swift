@@ -24,7 +24,7 @@ integration.
 ## Documents
 
 - [grenton-core-spec](https://github.com/osieckiAdam/grenton-core-spec): the language-agnostic specification and conformance suite. It is vendored at `vendor/grenton-core-spec` as a git submodule.
-- [`docs/grenton-core-swift-port.md`](docs/grenton-core-swift-port.md) — Swift port plan (this repository)
+- [`docs/grenton-core-swift-port.md`](docs/grenton-core-swift-port.md) — the Swift port plan: maintainers' notes, in Polish
 
 ## Modules
 
@@ -141,8 +141,10 @@ an app would. Each one is a single `main.swift` meant to be read.
 | [`fetch-interface`](Examples/fetch-interface/main.swift) | Download the interface from Object Manager with the PIN and save it | no |
 | [`import-project`](Examples/import-project/main.swift) | Read the interface from an Object Manager project file (`.omp`) instead of downloading it, and list the devices | no (offline) |
 | [`list-devices`](Examples/list-devices/main.swift) | Devices and entities per page, skipped widgets, objects shown by several widgets | no (offline) |
+| [`read-values`](Examples/read-values/main.swift) | Read any CLU value once — a feature no widget shows — without subscribing | no |
 | [`watch-state`](Examples/watch-state/main.swift) | Every entity's normalized state after connecting, then changes as they happen | no |
 | [`switch-light`](Examples/switch-light/main.swift) | Turn a switch, dimmer or RGB light on/off and wait for the CLU to confirm | **yes** |
+| [`run-scene`](Examples/run-scene/main.swift) | Run a scene by its name or entity id | **yes** |
 | [`set-thermostat`](Examples/set-thermostat/main.swift) | Find a thermostat by its CLU object, read its state, set the target temperature and confirm the CLU applied it | **yes** |
 | [`probe-register`](Examples/probe-register/main.swift) | Research probe behind spec §5.3.2 and §5.4.4: registers a watched object and up to 29 other keys of one CLU in several `clientRegister` forms, measures where the pushes go, how long a registration lives, the largest registration a CLU answers, `fetchValues`, and (phase K) which value forms an action accepts | only phase K, which writes a dimmer you name and restores it |
 

@@ -18,25 +18,33 @@ public enum SessionState: Sendable, Equatable {
     case stopped
 }
 
+/// Why a command or a request to a CLU failed.
 public enum SessionError: Error, Sendable, Equatable {
+    /// The system is not started, or has been stopped: nothing was sent.
     case notConnected
+    /// The connection was closed — by `stop()` or a replacement — while the request waited.
     case connectionClosed
+    /// The CLU did not answer within the response timeout.
     case timeout
     /// A request with this message id is already awaiting a response
     /// (overlapping ping, or a — vanishingly unlikely — random collision).
     case duplicateMessageId
 }
 
+/// Why a UDP connection to a CLU could not be opened.
 public enum TransportError: Error, Sendable, Equatable {
     /// Port outside 1...65535 — validated here, not in the Model (spec §3.4).
     case invalidPort(Int)
+    /// The system refused the connection, for example without local-network access.
     case connectionFailed(String)
 }
 
 /// Result slot of a registration position (spec §5.4.2): distinguishes a
 /// failed chunk from a real value — including a real `nil` from the CLU.
 public enum RegistrationSlot: Sendable, Equatable {
+    /// The CLU did not answer for this key, or answered unusably; the stored value is unchanged.
     case failed
+    /// The value the CLU reported, `.null` included.
     case value(GrentonValue)
 }
 
@@ -110,8 +118,12 @@ public struct GrentonLogger: Sendable {
         print("[grenton][\(level)] \(message)")
     }
 
+    /// Every frame sent and received, and other detail.
     public func debug(_ message: @autoclosure () -> String) { handler(.debug, message()) }
+    /// Milestones: a session started, a subscription renewed.
     public func info(_ message: @autoclosure () -> String) { handler(.info, message()) }
+    /// A CLU that did not answer, a connection replaced; the library carries on.
     public func warning(_ message: @autoclosure () -> String) { handler(.warning, message()) }
+    /// A reply the library could not use.
     public func error(_ message: @autoclosure () -> String) { handler(.error, message()) }
 }

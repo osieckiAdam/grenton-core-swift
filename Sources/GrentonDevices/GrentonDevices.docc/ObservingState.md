@@ -31,6 +31,13 @@ for entity in system.entities {
 
 Buttons, scenes and cameras have no state, so their `updates()` is `nil`.
 
+The stream tells you *that* something changed, not what: read the
+entity. It does not fire for the values known at `start()`, only for later
+changes, so read the state once before you wait. Each call makes a new,
+independent stream; a consumer that falls behind sees the latest changes
+and misses the ones in between, which is harmless because the entity
+always holds the current value.
+
 ### Read values once
 
 A subscription keeps values fresh for as long as the system runs. For a

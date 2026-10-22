@@ -27,7 +27,7 @@ let package = Package(
     targets: [
         .target(name: "GrentonModel"),
         .target(name: "GrentonRuntime", dependencies: ["GrentonModel"]),
-        .target(name: "GrentonDevices", dependencies: ["GrentonModel", "GrentonRuntime"]),
+        .target(name: "GrentonDevices", dependencies: ["GrentonModel", "GrentonRuntime", "GrentonProvisioning"]),
         .target(name: "GrentonTestSupport", dependencies: ["GrentonModel", "GrentonRuntime"]),
         .executableTarget(
             name: "grenton-cli",
@@ -58,6 +58,16 @@ let package = Package(
             name: "set-thermostat",
             dependencies: ["GrentonProvisioning", "GrentonRuntime", "GrentonDevices"],
             path: "Examples/set-thermostat"
+        ),
+        .executableTarget(
+            name: "run-scene",
+            dependencies: ["GrentonProvisioning", "GrentonDevices"],
+            path: "Examples/run-scene"
+        ),
+        .executableTarget(
+            name: "read-values",
+            dependencies: ["GrentonModel", "GrentonProvisioning", "GrentonDevices"],
+            path: "Examples/read-values"
         ),
         .executableTarget(
             name: "import-project",

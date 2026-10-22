@@ -31,10 +31,23 @@ Use them to store your own settings per entity.
 
 ### Normalized state
 
-Entities never expose raw CLU values. A switch is on or off, a dimmer's
-brightness runs from 0 to 1, a shutter's position from 0 (closed) to 100
-(open), whatever the device reports internally. Values are `nil` until
-the CLU has reported them.
+Entities hide how a device encodes its state: a switch is on or off, a
+dimmer's brightness runs from 0 to 1, a shutter's position from 0 (closed)
+to 100 (open), whatever the device reports internally. Values are `nil`
+until the CLU has reported them. The one exception is ``SensorEntity``,
+whose `value` is the reported `GrentonValue` itself, with the unit and
+precision of its descriptor to present it.
+
+| Entity | Property | Type and range |
+|---|---|---|
+| ``ToggleEntity`` | `isOn` | `Bool` |
+| ``DimmableLightEntity`` | `brightness` | `Double`, 0…1 |
+| ``HsbLightEntity`` | `hue`, `saturation`, `brightness` | `Double`: 0…360°, 0…1, 0…1 |
+| ``CoverEntity`` | `position`, `tilt` | `Int`, 0 closed … 100 open |
+| ``ThermostatEntity`` | `currentTemperature`, `targetTemperature` | `Double`, °C |
+| ``NumberSettingEntity`` | `value` | `Double` in the widget's range |
+| ``ContactSensorEntity``, ``StateSensorEntity`` | `isOn` / `state` | `Bool` / `GrentonValue` |
+| ``SensorEntity`` | `value` | `GrentonValue`, see `SensorDescriptor` |
 
 ### Physical objects
 

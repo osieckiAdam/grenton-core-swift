@@ -5,6 +5,15 @@ Versions follow the specification the port implements; see README,
 
 ## Unreleased
 
+- `GrentonSystem(interfaceArchive:)` starts from the downloaded or saved
+  archive directly; `GrentonDevices` now depends on `GrentonProvisioning`.
+  `GrentonSystem.clus` lists the CLUs, so an app can name the one behind a
+  session state. New examples `read-values` and `run-scene`.
+- Documentation: "Running on iOS and macOS" (Info.plist keys, the first
+  prompt, background and foreground, keeping the key) and "Connection
+  Lifecycle" (states, recovery, what `stop()` does, every error a call can
+  throw); a units table, the semantics of `updates()`, the `supports…`
+  checks, and doc comments on the runtime types an app sees.
 - The DocC plugin is no longer a dependency apps resolve: `Package.swift`
   adds it only while `GRENTON_DOCS` is set, which `scripts/docs.sh` does.
 
