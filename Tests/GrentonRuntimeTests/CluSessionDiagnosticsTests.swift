@@ -28,7 +28,36 @@ import GrentonTestSupport
 
     @Test func idleBeforeStart() async throws {
         let (_, session) = try makeFixture()
-        #expect(await session.diagnostics == .idle)
+        let d = await session.diagnostics
+        #expect(d.state == .idle)
+        #expect(d.sinceLastReply == nil && d.sinceLastReport == nil && d.lastPingRoundTrip == nil)
+        #expect(d.requestedKeyCount == 0 && !d.recoveryPending && d.consecutivePingTimeouts == 0)
+    }
+
+    @Test func anEmptyListClearsRecoveryAndStreakSurvivesTheSocket() async throws {
+        let (fake, session) = try makeFixture()
+        await session.start()
+        await fake.setSilenced { $0.hasPrefix("SYSTEM:clientRegister(") }
+        _ = await session.register(keys(1))
+        #expect(await session.diagnostics.recoveryPending)
+        await fake.setSilenced { _ in false }
+        _ = await session.register([])
+        var d = await session.diagnostics
+        #expect(!d.recoveryPending)
+        #expect(d.requestedKeyCount == 0)
+
+        // Three unanswered pings retire the socket; the count stays
+        // visible until a new socket is installed by the next ping.
+        await fake.setSilenced { $0 == "checkAlive()" }
+        for _ in 0..<3 { _ = await session.ping() }
+        d = await session.diagnostics
+        #expect(d.consecutivePingTimeouts == 3)
+        await fake.setSilenced { _ in false }
+        #expect(await session.ping())
+        d = await session.diagnostics
+        #expect(d.consecutivePingTimeouts == 0)
+        #expect(d.lastPingRoundTrip != nil)
+        await session.stop()
     }
 
     @Test func startRecordsTheFirstPing() async throws {

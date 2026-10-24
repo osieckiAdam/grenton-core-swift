@@ -25,8 +25,14 @@ Versions follow the specification the port implements; see README,
 - `GrentonSystem.diagnostics()` and `CluSession.diagnostics`: a
   `SessionDiagnostics` snapshot per CLU — state, time since the last
   reply and the last report, the last ping's round trip, requested key
-  count, whether recovery is pending, unanswered pings in a row (spec
-  §5.4.5). Every CLU of the interface is listed, `idle` before `start()`.
+  count, whether recovery is pending, unanswered pings in a row, and the
+  sampling time the ages count back from (spec §5.4.5). Every CLU of the
+  interface is listed, `idle` before `start()`. Reviewed (Codex): a report
+  arriving during the teardown no longer revives the cleared times, the
+  timeout streak stays visible until a new socket is actually installed,
+  the ping round trip is taken from the hand-over to the transport until
+  correlation, and the recovery flag changes the moment a chunk fails or
+  an empty list is accepted.
 - `GrentonKit`, the umbrella module: `import GrentonKit` re-exports the
   four modules, and `GrentonSystem(interfaceArchive:)` lives there, so
   `GrentonDevices` depends on Model and Runtime only again (spec §2). The
@@ -46,8 +52,12 @@ Versions follow the specification the port implements; see README,
   scenarios in `scripts/consumer/` — complete app code against the public
   API, no `@testable`. `scripts/docs.sh` puts the working tree's
   `Package.resolved` back byte for byte as soon as the generation ends
-  (it restored the index's copy, on exit). The DocC plugin is a dependency
-  only when `GRENTON_DOCS` is exactly `1`.
+  (it restored the index's copy, on exit), also on INT/TERM/HUP, and
+  checks that the Kit, Simulation and archive-initializer pages exist. The
+  DocC plugin is a dependency only when `GRENTON_DOCS` is exactly `1`.
+  A snippet is compiled with exactly the imports it shows, so every
+  documented example that uses `Data` or `URL` now shows `import
+  Foundation` too.
 - Gates: `scripts/check.sh` fails when the git hooks are not enabled or the
   installation-data gate differs from the spec's copy; that gate also reads
   a declared `.omp` (`git config grenton.project`), scans ZIP/.omp files

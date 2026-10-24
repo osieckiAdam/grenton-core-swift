@@ -59,7 +59,8 @@ targets: [
     ]),
 ]</code></pre>
         <p>Download the interface once, then start from the saved copy and list your lights:</p>
-<pre><code class="language-swift">import GrentonKit
+<pre><code class="language-swift">import Foundation
+import GrentonKit
 
 // Once: Object Manager shows the address and the PIN in "Send to mobile devices".
 let archive = try await ProvisioningClient(host: "192.168.1.50").fetchInterfaceArchive(pin: "149 853")

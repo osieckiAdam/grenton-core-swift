@@ -9,6 +9,7 @@ Everything an app needs, in one import.
 join them: creating a `GrentonSystem` straight from an interface archive.
 
 ```swift
+import Foundation
 import GrentonKit
 
 let archive = try Data(contentsOf: URL(fileURLWithPath: "interface.zip"))

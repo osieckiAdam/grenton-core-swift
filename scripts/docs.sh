@@ -30,12 +30,20 @@ cp docs/images/om-send-to-mobile.png "$SITE/assets/"
 RESOLVED_BACKUP=$(mktemp)
 HAD_RESOLVED=0
 if [ -f Package.resolved ]; then cp Package.resolved "$RESOLVED_BACKUP"; HAD_RESOLVED=1; fi
+GENERATOR=
 restore_resolved() {
-    if [ "$HAD_RESOLVED" = 1 ]; then cp "$RESOLVED_BACKUP" Package.resolved; else rm -f Package.resolved; fi
-    rm -f "$RESOLVED_BACKUP"
-    trap - EXIT
+    # Idempotent: the generator must be gone first, or it rewrites the file
+    # after the restore.
+    if [ -n "$GENERATOR" ]; then kill "$GENERATOR" 2>/dev/null; wait "$GENERATOR" 2>/dev/null; GENERATOR=; fi
+    if [ -f "$RESOLVED_BACKUP" ]; then
+        if [ "$HAD_RESOLVED" = 1 ]; then cp "$RESOLVED_BACKUP" Package.resolved; else rm -f Package.resolved; fi
+        rm -f "$RESOLVED_BACKUP"
+    fi
 }
-trap restore_resolved EXIT
+# EXIT alone does not run on a signal; name them.
+trap 'restore_resolved' EXIT
+trap 'restore_resolved; exit 130' INT
+trap 'restore_resolved; exit 143' TERM HUP
 GRENTON_DOCS=1 swift package --allow-writing-to-directory "$SITE/api" generate-documentation \
     --target GrentonModel --target GrentonRuntime \
     --target GrentonProvisioning --target GrentonDevices \
@@ -44,7 +52,9 @@ GRENTON_DOCS=1 swift package --allow-writing-to-directory "$SITE/api" generate-d
     --transform-for-static-hosting --warnings-as-errors \
     --experimental-enable-custom-templates \
     --hosting-base-path "${BASE_PATH}api" \
-    --output-path "$SITE/api"
+    --output-path "$SITE/api" &
+GENERATOR=$!
+if wait "$GENERATOR"; then GENERATOR=; else STATUS=$?; GENERATOR=; restore_resolved; exit $STATUS; fi
 restore_resolved
 
 # DocC can report an error and still exit 0; make sure the reference exists.
@@ -52,7 +62,11 @@ restore_resolved
 # root, which depends on where the site is hosted.
 find "$SITE/api" -name index.html -exec sed -i '' "s#__BASE__#/${BASE_PATH}#g" {} +
 
-for page in index.html getting-started/index.html api/documentation/grentondevices/index.html; do
+for page in index.html getting-started/index.html \
+    api/documentation/grentondevices/index.html \
+    api/documentation/grentonkit/index.html \
+    api/documentation/grentonsimulation/simulatedgrentonsystem/index.html \
+    "api/documentation/grentonkit/grentonsystem/init(interfacearchive:socketfactory:logger:pinginterval:registerinterval:responsetimeout:)/index.html"; do
     if [ ! -f "$SITE/$page" ]; then
         echo "error: $page was not generated (see the output above)" >&2
         exit 1

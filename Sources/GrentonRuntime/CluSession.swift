@@ -36,8 +36,14 @@ extension Clock where Duration == Swift.Duration {
     /// How much time passed since an instant made by `deadline(after:)` or
     /// `instant()` on this clock.
     func elapsed(since instant: any Sendable) -> Duration? {
-        guard let instant = instant as? Instant else { return nil }
-        return instant.duration(to: now)
+        elapsed(from: instant, to: now)
+    }
+
+    /// The time between two instants of this clock, so that several ages
+    /// can share one reading of `now`.
+    func elapsed(from start: any Sendable, to end: any Sendable) -> Duration? {
+        guard let start = start as? Instant, let end = end as? Instant else { return nil }
+        return start.duration(to: end)
     }
 
     /// `now`, opaque, for `elapsed(since:)`.
@@ -106,14 +112,19 @@ public actor CluSession {
     /// When the last notification was accepted and published.
     private var lastReportAt: (any Sendable)?
     private var lastPingRoundTrip: Duration?
+    /// When the ping in flight was handed to the transport; its round trip
+    /// is taken at correlation, not when the caller resumes.
+    private var pingSentAt: (any Sendable)?
 
     /// One consistent observation of this connection (spec §5.4.5). Sends
     /// nothing and waits for nothing but the actor.
     public var diagnostics: SessionDiagnostics {
-        SessionDiagnostics(
+        let now = clock.instant()
+        return SessionDiagnostics(
             state: state,
-            sinceLastReply: lastReplyAt.flatMap { clock.elapsed(since: $0) },
-            sinceLastReport: lastReportAt.flatMap { clock.elapsed(since: $0) },
+            sampledAt: Date(),
+            sinceLastReply: lastReplyAt.flatMap { clock.elapsed(from: $0, to: now) },
+            sinceLastReport: lastReportAt.flatMap { clock.elapsed(from: $0, to: now) },
             lastPingRoundTrip: lastPingRoundTrip,
             requestedKeyCount: desiredKeys.count,
             recoveryPending: needsRecovery,
@@ -364,10 +375,8 @@ public actor CluSession {
         // rollover, failure, stop) says nothing about the current one.
         let generation = mainSocketGeneration
         do {
-            let sentAt = clock.instant()
             _ = try await sendRequest(Payloads.checkAlive, msgId: keepAliveId, over: socket)
             guard state != .stopped, generation == mainSocketGeneration else { return false }
-            lastPingRoundTrip = clock.elapsed(since: sentAt)
             consecutivePingTimeouts = 0
             if needsRecovery && !desiredKeys.isEmpty {
                 await recoverSubscriptions(gateHeld: gateHeld)
@@ -437,13 +446,15 @@ public actor CluSession {
     }
 
     private func openAndInstallMainSocket() async {
-        consecutivePingTimeouts = 0
         do {
             let socket = try await openTracked()
             guard state != .stopped, mainSocket == nil else {
                 socket.close()
                 return
             }
+            // A new socket gets its own three tries (spec §5.4.5); until one is
+            // installed the last socket's count stays visible.
+            consecutivePingTimeouts = 0
             mainSocket = socket
             mainSocketGeneration += 1
             mainRouterTask = makeRouter(
@@ -592,6 +603,7 @@ public actor CluSession {
         reregistrationDeadline = nil
         guard state != .stopped else { return keys.map { _ in .failed } }
         guard !keys.isEmpty else {
+            needsRecovery = false   // nothing left to recover (spec §5.4.5)
             await destroy(subscriptions.keys.sorted())
             chunks = []
             return []
@@ -619,6 +631,8 @@ public actor CluSession {
         for chunk in plan {
             let slots = await registerChunk(chunk)
             results += slots
+            // Visible as soon as it happens, not when the whole list is done.
+            if slots.contains(.failed), state != .stopped { needsRecovery = true }
             if publishingChunks, state != .stopped, !slots.contains(.failed) {
                 publishReport(ChunkReport(keys: chunk.keys, slots: slots))
             }
@@ -831,6 +845,7 @@ public actor CluSession {
                     // stop() or a timeout may have ended the request before
                     // this task ran: then nothing goes out.
                     guard self.pending[id]?.token == token, self.state != .stopped else { return }
+                    if id == self.keepAliveId { self.pingSentAt = self.clock.instant() }
                     do {
                         try await socket.send(datagram)
                     } catch {
@@ -894,6 +909,9 @@ public actor CluSession {
     }
 
     private func handleDatagram(_ data: Data, from source: DatagramSource) {
+        // stop() has run: a report that still arrives while the teardown
+        // drains must not touch the diagnostics it cleared (spec §5.4.5).
+        guard state != .stopped else { return }
         guard isCurrent(source) else {
             logger.debug("[\(clu.name)] Dropping datagram from a stale socket")
             return
@@ -915,7 +933,12 @@ public actor CluSession {
         logger.debug("[\(clu.name)][\(response.msgId)] Received: \(text)")
 
         if let entry = pending.removeValue(forKey: response.msgId) {
-            lastReplyAt = clock.instant()
+            let now = clock.instant()
+            lastReplyAt = now
+            if response.msgId == keepAliveId, let sentAt = pingSentAt {
+                lastPingRoundTrip = clock.elapsed(since: sentAt)
+                pingSentAt = nil
+            }
             entry.continuation.resume(returning: response)
             return
         }

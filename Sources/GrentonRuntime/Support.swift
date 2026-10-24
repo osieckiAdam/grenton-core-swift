@@ -67,9 +67,11 @@ public typealias RegistrationSlot = ValueSlot
 ///     print(cluId, health.state, health.sinceLastReply ?? "never answered")
 /// }
 /// ```
-public struct SessionDiagnostics: Sendable, Equatable {
+public struct SessionDiagnostics: Sendable {
     /// The connection state.
     public let state: SessionState
+    /// When this snapshot was taken; the ages below count back from it.
+    public let sampledAt: Date
     /// How long ago the CLU last answered a request of this connection;
     /// `nil` when it has not since the last ``CluSession/start()``. A reply
     /// counts once it matches its request, even if its content then fails
@@ -99,6 +101,7 @@ public struct SessionDiagnostics: Sendable, Equatable {
     /// Creates a snapshot, for simulations and tests.
     public init(
         state: SessionState,
+        sampledAt: Date = Date(),
         sinceLastReply: Duration? = nil,
         sinceLastReport: Duration? = nil,
         lastPingRoundTrip: Duration? = nil,
@@ -107,6 +110,7 @@ public struct SessionDiagnostics: Sendable, Equatable {
         consecutivePingTimeouts: Int = 0
     ) {
         self.state = state
+        self.sampledAt = sampledAt
         self.sinceLastReply = sinceLastReply
         self.sinceLastReport = sinceLastReport
         self.lastPingRoundTrip = lastPingRoundTrip
@@ -115,8 +119,8 @@ public struct SessionDiagnostics: Sendable, Equatable {
         self.consecutivePingTimeouts = consecutivePingTimeouts
     }
 
-    /// A connection that was never started.
-    public static let idle = SessionDiagnostics(state: .idle)
+    /// A connection that was never started, sampled now.
+    public static var idle: SessionDiagnostics { SessionDiagnostics(state: .idle) }
 }
 
 /// Report delivered for one subscription chunk: the chunk's keys paired

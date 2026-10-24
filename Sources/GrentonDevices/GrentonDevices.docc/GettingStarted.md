@@ -42,6 +42,7 @@ devices**. The dialog shows the computer's IP address, the port and a
 token, the PIN. Keep it open while you download:
 
 ```swift
+import Foundation
 import GrentonKit
 
 let client = ProvisioningClient(host: "192.168.1.50")
@@ -67,6 +68,7 @@ let fromProject = try GrentonSystem(interface: project.interface())
 Later runs load the saved archive; no PIN and no Object Manager needed:
 
 ```swift
+import Foundation
 import GrentonKit
 
 let system = try GrentonSystem(
