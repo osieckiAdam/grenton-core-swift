@@ -2,6 +2,8 @@ import Foundation
 import CommonCrypto
 import GrentonModel
 
+@nonexhaustive
+
 public enum CryptoError: Error, Sendable, Equatable {
     case invalidKeyMaterial
     case encryptFailed

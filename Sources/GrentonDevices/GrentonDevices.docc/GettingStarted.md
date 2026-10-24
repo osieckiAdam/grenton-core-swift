@@ -5,8 +5,9 @@ a light.
 
 ## Overview
 
-You need a Mac or iPhone on the same network as the CLU controllers, and a
-computer running Grenton Object Manager for the first step.
+You need a Mac or iPhone on the same network as the CLU controllers, a
+computer running Grenton Object Manager for the first step, and Xcode
+26.2 or later (Swift 6.2.3) to build.
 
 ### Add the package
 

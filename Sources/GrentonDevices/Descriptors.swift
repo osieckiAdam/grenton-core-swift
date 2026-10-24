@@ -48,6 +48,7 @@ public struct DevicePage: Hashable, Sendable {
 /// What a device is, whichever entities it has.
 ///
 /// A door sensor with a button is still a ``contactSensor``.
+@nonexhaustive
 public enum DeviceKind: String, Sendable, CaseIterable {
     /// An on/off switch.
     case `switch`
@@ -74,6 +75,7 @@ public enum DeviceKind: String, Sendable, CaseIterable {
 }
 
 /// An entity as plain data: what it reads and which actions it sends. `GrentonSystem` turns it into a live ``BoundEntity``.
+@nonexhaustive
 public enum EntityDescriptor: Identifiable, Sendable {
     case toggle(ToggleDescriptor)
     case dimmableLight(DimmableLightDescriptor)
@@ -290,6 +292,7 @@ public struct ContactSensorDescriptor: Sendable {
 
 // Fixed multisensor channel kinds with canonical units (spec §6.3.6).
 /// What a sensor measures. Multisensor channels have a fixed kind and unit; other sensors are ``generic``.
+@nonexhaustive
 public enum SensorKind: String, Sendable {
     case generic
     case co2
@@ -471,6 +474,7 @@ public struct ThermostatDescriptor: Sendable {
 /// Entities with equal keys control the same hardware, even when they come from different widgets.
 public struct ObjectKey: Hashable, Sendable {
     /// The kind of thing on the CLU.
+    @nonexhaustive
     public enum Kind: String, Sendable {
         /// An object such as THE1001 or DOU1001 (attribute/method calls).
         case object

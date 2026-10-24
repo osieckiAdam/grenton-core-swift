@@ -184,6 +184,8 @@ public struct LedSliderComponentDTO: Decodable, Sendable {
     public let range: RangeDTO
 }
 
+@nonexhaustive
+
 public enum LedComponentDTO: Decodable, Sendable {
     case button(LedButtonComponentDTO)
     case hue(LedSliderComponentDTO)

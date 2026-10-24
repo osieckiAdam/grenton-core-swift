@@ -103,7 +103,11 @@ enum JSONValue: Sendable {
 /// constants, duplicate object keys, integers outside Int64, numbers that
 /// are not finite as doubles, and unreasonable nesting.
 struct StrictJSONParser {
-    static let maxDepth = 512
+    /// Deep enough for any interface or project node (they nest about ten
+    /// levels) and shallow enough that the recursive descent cannot
+    /// overflow a secondary thread's 512 KB stack in a debug build, which
+    /// 512 levels did.
+    static let maxDepth = 64
 
     private let bytes: [UInt8]
     private var index = 0

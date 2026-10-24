@@ -41,9 +41,9 @@ func offlineDevices(projectFile: Data) throws {
     }
 }
 
-/// Every entity kind an app can meet, switched exhaustively as the
-/// library ships it today. Adding a case is a source-breaking change for
-/// this function until the enums are marked extensible.
+/// Every entity kind an app can meet. The enum is `@nonexhaustive`: a
+/// library release may add a kind, and `@unknown default` keeps this
+/// compiling (and warns here when a known case is unhandled).
 func describe(_ entity: BoundEntity) -> String {
     switch entity {
     case .toggle(let e): return e.name
@@ -58,6 +58,7 @@ func describe(_ entity: BoundEntity) -> String {
     case .sceneTrigger(let e): return e.name
     case .camera(let e): return e.name
     case .thermostat(let e): return e.name
+    @unknown default: return "unsupported"
     }
 }
 
@@ -67,6 +68,6 @@ func explain(_ error: any Error) -> String {
     case SessionError.notConnected: return "not connected"
     case SessionError.timeout: return "no answer"
     case ProvisioningError.authenticationFailed: return "wrong PIN"
-    default: return String(describing: error)
+    default: return String(describing: error)   // also any case added later
     }
 }

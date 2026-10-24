@@ -46,6 +46,7 @@ for (spec, slot) in zip(arguments[3...], slots) {
     switch slot {
     case .value(let value): print("\(spec) = \(text(value))")
     case .failed: print("\(spec): no answer")
+    @unknown default: print("\(spec): unknown result")
     }
 }
 await system.stop()

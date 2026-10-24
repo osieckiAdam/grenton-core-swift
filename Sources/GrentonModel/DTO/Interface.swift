@@ -23,6 +23,7 @@ public struct SectionHeaderDTO: Sendable {
 }
 
 /// One element of a page, in layout order.
+@nonexhaustive
 public enum PageItemDTO: Sendable {
     /// A widget the library understands.
     case widget(WidgetDTO)

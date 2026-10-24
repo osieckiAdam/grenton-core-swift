@@ -40,7 +40,7 @@ GRENTON_DOCS=1 swift package --allow-writing-to-directory "$SITE/api" generate-d
     --target GrentonModel --target GrentonRuntime \
     --target GrentonProvisioning --target GrentonDevices \
     --target GrentonKit --target GrentonSimulation \
-    --enable-experimental-combined-documentation \
+    --enable-experimental-combined-documentation --include-extended-types \
     --transform-for-static-hosting --warnings-as-errors \
     --experimental-enable-custom-templates \
     --hosting-base-path "${BASE_PATH}api" \

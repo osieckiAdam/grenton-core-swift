@@ -3,6 +3,7 @@ import GrentonModel
 import ZIPFoundation
 
 /// Why downloading the interface failed.
+@nonexhaustive
 public enum ProvisioningError: Error, Sendable, Equatable {
     /// Object Manager rejected the PIN, or its “Send to mobile devices” dialog is closed.
     case authenticationFailed

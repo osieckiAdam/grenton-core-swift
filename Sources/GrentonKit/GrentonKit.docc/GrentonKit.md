@@ -21,8 +21,15 @@ some of them — the devices without the Object Manager client, say — and
 none of them depends on this one. The reference for the types lives with
 their modules; start with `GrentonDevices`.
 
+This module adds one thing of its own:
+`GrentonSystem.init(interfaceArchive:socketFactory:logger:pingInterval:registerInterval:responseTimeout:)`,
+which reads the archive `ProvisioningClient` downloaded (or one saved
+earlier) and creates the system from it — the `GrentonDevices` initializer
+takes a parsed interface instead. For the devices without a connection, see
+`GrentonSimulation`.
+
 ## Topics
 
 ### Starting from an archive
 
-- ``GrentonDevices/GrentonSystem/init(interfaceArchive:socketFactory:logger:pingInterval:registerInterval:responseTimeout:)``
+- ``GrentonSystem/init(interfaceArchive:socketFactory:logger:pingInterval:registerInterval:responseTimeout:)``

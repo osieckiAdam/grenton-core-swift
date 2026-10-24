@@ -3,11 +3,15 @@
 // All decode strictly: an unknown raw value fails the decode of the element
 // that carries it, which at widget level means the widget is skipped (spec §3.6).
 
+@nonexhaustive
+
 public enum GrentonUnit: String, Decodable, Hashable, Sendable {
     case unknown = "UNKNOWN"
     case percent = "PERCENT"
     case degree = "DEGREE"
 }
+
+@nonexhaustive
 
 public enum GrentonValueType: String, Decodable, Hashable, Sendable {
     case string = "STRING"
@@ -15,16 +19,22 @@ public enum GrentonValueType: String, Decodable, Hashable, Sendable {
     case integer = "INTEGER"
 }
 
+@nonexhaustive
+
 public enum GrentonValueCallType: String, Decodable, Hashable, Sendable {
     case variable = "VARIABLE"
     case attribute = "ATTRIBUTE"
 }
+
+@nonexhaustive
 
 public enum GrentonActionEvent: String, Decodable, Hashable, Sendable {
     case click = "CLICK"
     case on = "ON"
     case off = "OFF"
 }
+
+@nonexhaustive
 
 public enum GrentonActionCallType: String, Decodable, Hashable, Sendable {
     case variable = "VARIABLE"
@@ -33,12 +43,16 @@ public enum GrentonActionCallType: String, Decodable, Hashable, Sendable {
     case script = "SCRIPT"
 }
 
+@nonexhaustive
+
 public enum GrentonComponentIndication: String, Decodable, Hashable, Sendable {
     case onOff = "ON_OFF"
     case openClosed = "OPEN_CLOSED"
     case openLocked = "OPEN_LOCKED"
     case upDown = "UP_DOWN"
 }
+
+@nonexhaustive
 
 public enum GrentonTheme: String, Decodable, Hashable, Sendable {
     case grenton = "GRENTON"
@@ -57,6 +71,8 @@ public enum GrentonTheme: String, Decodable, Hashable, Sendable {
     case beige = "BEIGE"
     case brown = "BROWN"
 }
+
+@nonexhaustive
 
 public enum GrentonCluConnectionType: String, Decodable, Hashable, Sendable {
     case localOnly = "LOCAL_ONLY"

@@ -60,6 +60,11 @@ extension BoundDevice: Identifiable {
     public var id: String { descriptor.id }
 }
 
+// Catalogue enums are @nonexhaustive (SE-0487): Grenton adds widget types,
+// so a new case is a minor release. Inside this package switches stay
+// exhaustive; an app adds `@unknown default`. Frozen by design and so
+// left exhaustive: GrentonValue, ValueRef (the wire protocol's shapes),
+// SessionState, DeviceNumberFormat.
 /// A live entity: something you read or control, such as a light, a
 /// thermostat or a sensor.
 ///
@@ -72,6 +77,7 @@ extension BoundDevice: Identifiable {
 /// ```
 ///
 /// For lights and switches, ``switchable`` saves the switch.
+@nonexhaustive
 public enum BoundEntity: Sendable {
     case toggle(ToggleEntity)
     case dimmableLight(DimmableLightEntity)
@@ -451,6 +457,7 @@ public final class NumberSettingEntity: Sendable {
 }
 
 /// What a shutter is doing right now.
+@nonexhaustive
 public enum CoverMotion: Sendable, Equatable {
     /// Not moving.
     case idle
@@ -558,6 +565,7 @@ public final class CoverEntity: Sendable {
 }
 
 /// What an older-style shutter reports: stopped, opening, closing, locked or unknown.
+@nonexhaustive
 public enum LegacyShutterState: String, Sendable {
     case stopped, opening, closing, locked, unknown
 }
@@ -650,6 +658,7 @@ public final class CameraEntity: Sendable {
 
 // Thermostat operating mode — the Mode feature (spec §6.3.12).
 /// How a thermostat picks its target temperature.
+@nonexhaustive
 public enum ThermostatMode: Int, Sendable, CaseIterable {
     /// Holds the set point you choose with `setTargetTemperature(_:)`.
     case manual = 0

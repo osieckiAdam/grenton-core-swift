@@ -5,6 +5,17 @@ Versions follow the specification the port implements; see README,
 
 ## Unreleased
 
+- Requires Swift 6.2.3 (Xcode 26.2) to build; apps still run on iOS 16 /
+  macOS 13. The catalogue enums (`BoundEntity`, `EntityDescriptor`,
+  `DeviceKind`, `SensorKind`, `ObjectKey.Kind`, `WidgetDTO`, `PageItemDTO`,
+  `LedComponentDTO`, the `Grenton…` value enums, `ValueSlot`, `CoverMotion`,
+  `ThermostatMode`, `LegacyShutterState`) and the error enums are
+  `@nonexhaustive`: a new case is a minor release, and a `switch` over
+  them in an app needs `@unknown default`. `GrentonValue`, `ValueRef`,
+  `SessionState` and `DeviceNumberFormat` stay exhaustive by design.
+- `StrictJSONParser` accepts 64 levels of nesting instead of 512: the
+  deeper limit let a crafted project file overflow the stack of a
+  secondary thread in a debug build before the limit was reached.
 - Follows spec 0.11.1 (suite 0.11.1, unchanged cases). An entity's
   `updates()` can no longer lose a signal: the store filters by key under
   its lock and keeps a flag per subscriber, instead of a forwarding task

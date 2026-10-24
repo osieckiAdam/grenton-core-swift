@@ -30,8 +30,14 @@ import Testing
     }
 
     @Test func rejectsDeepNesting() {
-        let deep = String(repeating: "[", count: 600) + String(repeating: "]", count: 600)
+        let limit = StrictJSONParser.maxDepth
+        let deep = String(repeating: "[", count: limit + 1) + String(repeating: "]", count: limit + 1)
         #expect(throws: ProvisioningError.self) { try parse(deep) }
+        let allowed = String(repeating: "[", count: limit) + String(repeating: "]", count: limit)
+        #expect(throws: Never.self) { try parse(allowed) }
+        // Far deeper input must be refused, not overflow the stack.
+        let far = String(repeating: "[", count: 5_000) + String(repeating: "]", count: 5_000)
+        #expect(throws: ProvisioningError.self) { try parse(far) }
     }
 }
 

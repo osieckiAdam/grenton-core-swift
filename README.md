@@ -42,7 +42,7 @@ integration.
 
 ## Quick start: try it against your installation
 
-You need a Mac with Swift 6.0+ (Xcode 16+ or the Command Line Tools), and a
+You need a Mac with Swift 6.2.3+ (Xcode 26.2+ or the Command Line Tools), and a
 computer running Grenton Object Manager on the same LAN as the Mac and the CLUs.
 
 ```sh
@@ -190,7 +190,7 @@ from the doc comments and the `.docc` catalogs.
 
 ## Requirements
 
-Swift 6.0+, iOS 16+ / macOS 13+. Apple platforms only: the runtime uses
+Swift 6.2.3+ (Xcode 26.2+) to build; apps run on iOS 16+ / macOS 13+. Apple platforms only: the runtime uses
 Network.framework and CommonCrypto, so there is no Linux build.
 
 ## Versioning and stability
@@ -201,11 +201,12 @@ package promises conformance with the spec, not a frozen API:
 `GrentonKit` (which re-exports `GrentonDevices` and `GrentonProvisioning`)
 and `GrentonSimulation` are what an app is meant to use and change
 deliberately; `GrentonModel` and `GrentonRuntime` are plumbing between
-them and may still change shape. `BoundEntity` and `EntityDescriptor` are
-exhaustive enums today: a new widget type adds a case, which is a
-source-breaking change for a `switch` without `default` until the
-minimum Swift is 6.2.3 and the enums are marked `@nonexhaustive`
-(planned before 1.0). Every change is listed in
+them and may still change shape. The catalogue enums — `BoundEntity`,
+`EntityDescriptor`, `DeviceKind`, `WidgetDTO`, the error enums and the
+others that grow with Grenton's products — are `@nonexhaustive`
+(SE-0487): a new case is a minor release, and a `switch` over them in an
+app needs `@unknown default`. That is why the package needs Swift 6.2.3
+to build. Every change is listed in
 [`CHANGELOG.md`](CHANGELOG.md).
 
 ## License

@@ -1,5 +1,7 @@
 // Domain-level references built from validated DTOs (spec §3.2–§3.3).
 
+@nonexhaustive
+
 public enum GrentonModelError: Error, Sendable, Equatable {
     case unknownDiscriminator(String)
     case missingIndex

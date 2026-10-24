@@ -21,7 +21,8 @@ step "Spec sync";          scripts/check-spec-sync.sh
 step "Build";              swift build
 step "Tests, including the conformance suite"
 if swift test > .build/check-tests.log 2>&1; then
-    grep -E "Test run with" .build/check-tests.log | tail -1
+    # One summary line per test bundle (SwiftPM runs them separately).
+    grep -E "Test run with" .build/check-tests.log | sed 's/^[^T]*//' | awk '{ n += $4; print "  " $0 } END { print "tests: " n " passed in all bundles" }'
 else
     grep -E "error:|recorded an issue|Test run" .build/check-tests.log | tail -20
     echo "tests failed — full log: .build/check-tests.log" >&2

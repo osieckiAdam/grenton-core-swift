@@ -19,6 +19,7 @@ public enum SessionState: Sendable, Equatable {
 }
 
 /// Why a command or a request to a CLU failed.
+@nonexhaustive
 public enum SessionError: Error, Sendable, Equatable {
     /// The system is not started, or has been stopped: nothing was sent.
     case notConnected
@@ -32,6 +33,7 @@ public enum SessionError: Error, Sendable, Equatable {
 }
 
 /// Why a UDP connection to a CLU could not be opened.
+@nonexhaustive
 public enum TransportError: Error, Sendable, Equatable {
     /// Port outside 1...65535 — validated here, not in the Model (spec §3.4).
     case invalidPort(Int)
@@ -42,6 +44,7 @@ public enum TransportError: Error, Sendable, Equatable {
 /// Result slot of one key of a registration or a one-shot read (spec
 /// §5.4.2): distinguishes a failed chunk from a real value — including a
 /// real `nil` from the CLU.
+@nonexhaustive
 public enum ValueSlot: Sendable, Equatable {
     /// The CLU did not answer for this key, or answered unusably; the stored value is unchanged.
     case failed

@@ -56,6 +56,8 @@ func state(of entity: BoundEntity) -> String? {
     case .stateSensor(let e): return "\(e.state)"
     case .thermostat(let e): return "\(show(e.currentTemperature)) °C, target \(show(e.targetTemperature)) °C"
     case .trigger, .sceneTrigger, .camera: return nil
+    // BoundEntity is @nonexhaustive: a newer library may add a kind.
+    @unknown default: return "(unsupported kind)"
     }
 }
 

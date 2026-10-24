@@ -124,6 +124,7 @@ public struct ThermostatV2WidgetDTO: Decodable, Sendable {
 // MARK: - Union
 
 /// One widget of the interface, by type.
+@nonexhaustive
 public enum WidgetDTO: Decodable, Sendable {
     case valueV2(ValueV2WidgetDTO)
     case valueDouble(ValueDoubleWidgetDTO)

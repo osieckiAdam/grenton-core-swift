@@ -15,6 +15,8 @@ package struct ClientReport: Equatable, Sendable {
     package let values: [GrentonValue]
 }
 
+@nonexhaustive
+
 public enum PayloadError: Error, Sendable, Equatable {
     /// A registration or fetch request must carry at least one key: the
     /// session never sends an empty list (spec §5.3.2).
