@@ -45,13 +45,17 @@ token, the PIN. Keep it open while you download:
 import Foundation
 import GrentonKit
 
+let store = try InterfaceStore()
 let client = ProvisioningClient(host: "192.168.1.50")
 let archive = try await client.fetchInterfaceArchive(pin: "149 853")
-try archive.write(to: URL(fileURLWithPath: "interface.zip"))
+try store.save(archive)
 ```
 
 The PIN may contain the space Object Manager shows. The archive holds the
-encryption key of your CLUs: store it privately, like a password.
+encryption key of your CLUs: `InterfaceStore` keeps it in the app's own
+folder under Application Support, with complete file protection on iOS —
+never write it to a plain file or `UserDefaults`. (A command-line tool has
+no bundle identifier and gives the store a URL instead.)
 
 The alternative to the download is the project file you save in Object
 Manager (`.omp`): it holds the same interface and the same key, and
@@ -71,10 +75,12 @@ Later runs load the saved archive; no PIN and no Object Manager needed:
 import Foundation
 import GrentonKit
 
-let system = try GrentonSystem(
-    interfaceArchive: Data(contentsOf: URL(fileURLWithPath: "interface.zip")))
+let system = try InterfaceStore().system()
 await system.start()
 ```
+
+`GrentonSystem(interfaceArchive:)` does the same from archive bytes you
+keep elsewhere.
 
 ``GrentonSystem/init(interface:socketFactory:logger:pingInterval:registerInterval:responseTimeout:)``
 takes an already parsed interface instead, for example one imported from a
@@ -101,7 +107,9 @@ await system.stop()
 
 <doc:ConnectionLifecycle> covers what happens between `start()` and
 `stop()`, and the errors a command can throw. <doc:TestingYourApp> shows
-how to test your code against these entities without a CLU.
+how to test your code against these entities without a CLU. In a SwiftUI
+app, the `GrentonSwiftUI` module's `Observed` makes a view follow an
+entity (see <doc:ObservingState>).
 
 The repository's `Examples` directory has a complete program for each
 step; each is one `main.swift` meant to be read:

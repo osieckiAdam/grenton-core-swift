@@ -69,9 +69,10 @@ happens to commands and subscriptions around `stop()`.
 ### Keeping the interface
 
 The interface archive and the `.omp` project file both contain the AES key
-of the installation. Keep them where only the app can read them: on iOS a
-file in the app's container written with `.completeFileProtection`, or the
-key material in the Keychain; never in a shared location or in logs. The
-library itself never writes the key anywhere and keeps it out of error
-messages. On iOS, `Data.write(to:options:)` with `.completeFileProtection`
-keeps the file encrypted while the device is locked.
+of the installation. Keep them where only the app can read them. The
+`GrentonKit` module's `InterfaceStore` is that place: the app's own folder
+under Application Support, written atomically and, on iOS, with
+`.completeFileProtection`, so the file stays encrypted while the device is
+locked; it also tells a newer export apart by its `version`. Never put the
+archive in a shared location, in `UserDefaults` or in logs. The library
+itself never writes the key anywhere and keeps it out of error messages.

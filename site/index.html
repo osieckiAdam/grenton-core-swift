@@ -63,11 +63,15 @@ targets: [
 import GrentonKit
 
 // Once: Object Manager shows the address and the PIN in "Send to mobile devices".
-let archive = try await ProvisioningClient(host: "192.168.1.50").fetchInterfaceArchive(pin: "149 853")
-try archive.write(to: URL(fileURLWithPath: "interface.zip"))
+// The store keeps the archive, and the key inside it, in a protected file.
+let store = try InterfaceStore()
+if try store.load() == nil {
+    let archive = try await ProvisioningClient(host: "192.168.1.50").fetchInterfaceArchive(pin: "149 853")
+    try store.save(archive)
+}
 
 // Every start: from the saved archive, no PIN and no Object Manager.
-let system = try GrentonSystem(interfaceArchive: archive)
+let system = try store.system()
 await system.start()
 
 for light in system.entities.compactMap(\.switchable) {
