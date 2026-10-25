@@ -28,9 +28,3 @@ which reads the archive `ProvisioningClient` downloaded (or one saved
 earlier) and creates the system from it — the `GrentonDevices` initializer
 takes a parsed interface instead. For the devices without a connection, see
 `GrentonSimulation`.
-
-## Topics
-
-### Starting from an archive
-
-- ``GrentonSystem/init(interfaceArchive:socketFactory:logger:pingInterval:registerInterval:responseTimeout:)``
