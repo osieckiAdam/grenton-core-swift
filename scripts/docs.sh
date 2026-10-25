@@ -65,8 +65,7 @@ find "$SITE/api" -name index.html -exec sed -i '' "s#__BASE__#/${BASE_PATH}#g" {
 for page in index.html getting-started/index.html \
     api/documentation/grentondevices/index.html \
     api/documentation/grentonkit/index.html \
-    api/documentation/grentonsimulation/simulatedgrentonsystem/index.html \
-    "api/documentation/grentonkit/grentonsystem/init(interfacearchive:socketfactory:logger:pinginterval:registerinterval:responsetimeout:)/index.html"; do
+    api/documentation/grentonsimulation/simulatedgrentonsystem/index.html; do
     if [ ! -f "$SITE/$page" ]; then
         echo "error: $page was not generated (see the output above)" >&2
         exit 1
