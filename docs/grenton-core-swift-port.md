@@ -392,7 +392,7 @@ Każdy milestone kończy się zielonym testem; kolejność minimalizuje pracę �
 4. **CluSession + StateStore vs FakeCLU** — ping, register chunkowany, raporty, akcje, timeouty (zegar testowy).
 5. **GrentonProvisioning** — na nagranym ZIP-ie z prawdziwego OM (fixture).
 6. **GrentonDevices** — mapper + normalizacje; testy round-trip (dimmer, HSB, tilt).
-7. **`grenton-cli`** — smoke test na żywej instalacji użytkownika: listuje urządzenia, śledzi raporty, wykonuje akcję; tu weryfikujemy pytania otwarte (format liczb §5.3, zachowanie promptu Local Network).
+7. **`grenton-cli`** (usunięte 2026-10-26 — zastąpione przez przykłady w `Examples/`) — smoke test na żywej instalacji użytkownika: listuje urządzenia, śledzi raporty, wykonuje akcję; tu weryfikujemy pytania otwarte (format liczb §5.3, zachowanie promptu Local Network).
 
 ## 12. Ryzyka i pytania otwarte
 

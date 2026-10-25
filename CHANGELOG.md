@@ -5,6 +5,8 @@ Versions follow the specification the port implements; see README,
 
 ## Unreleased
 
+- `grenton-cli` and `make-watch-app.sh` are gone: the examples in
+  `Examples/` cover everything they did, one readable program each.
 - Documentation: the landing page and Getting Started keep the archive
   with `InterfaceStore` instead of a plain file; Observing State shows
   `Observed` for SwiftUI; Running on Apple Platforms points to the store;

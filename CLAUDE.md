@@ -25,7 +25,6 @@ port, the docs and the examples, and the gates.
 - `Sources/*/*.docc`: DocC articles. `GrentonDevices.docc/header.html` is the site navigation shown on every reference page; the other catalogs symlink it.
 - `site/`: the hand-written site pages (landing page with install tabs, Getting Started) and their CSS/JS.
 - `Examples/`: library examples.
-- `Examples/grenton-cli`: the smoke tool. It will move to its own repository.
 - `Tests/GrentonConformanceTests`: the conformance runner, with `port.json` declaring the suite version, profiles and skips.
 - `dist/`: git-ignored. It holds the user's saved interface, which contains the CLU encryption key, and the logs of live probes. Never commit it.
 - `docs/grenton-core-swift-port.md`: the port plan (maintainers' notes, Polish). Code comments cite it as "Swift plan §…".

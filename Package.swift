@@ -42,13 +42,6 @@ let package = Package(
         .target(name: "GrentonSwiftUI", dependencies: ["GrentonDevices"]),
         .target(name: "GrentonTestSupport", dependencies: ["GrentonModel", "GrentonRuntime"]),
         .executableTarget(
-            name: "grenton-cli",
-            dependencies: ["GrentonKit"],
-            path: "Examples/grenton-cli",
-            // Built as an app would build: only the public API.
-            packageAccess: false
-        ),
-        .executableTarget(
             name: "fetch-interface",
             dependencies: ["GrentonKit"],
             path: "Examples/fetch-interface",
