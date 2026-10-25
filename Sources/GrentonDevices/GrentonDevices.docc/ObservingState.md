@@ -45,6 +45,30 @@ every CLU, for logging. It keeps the newest 64 when a consumer falls
 behind and promises no complete history; the entities' `updates()` are
 the way to show state.
 
+### In SwiftUI
+
+The `GrentonSwiftUI` module (iOS 17 / macOS 14) wraps an entity so a view
+re-renders on every reported change, without a `.task` of your own:
+
+```swift
+import SwiftUI
+import GrentonKit
+import GrentonSwiftUI
+
+struct LightRow: View {
+    let light: Observed<ToggleEntity>
+    var body: some View {
+        Toggle(light.value.name, isOn: Binding(
+            get: { light.value.isOn == true },
+            set: { on in Task { try? await light.value.setOn(on) } }))
+    }
+}
+```
+
+Create the `Observed` where the entity lives (a view model or `@State`),
+not in `body`. Entities without state — buttons, scenes, cameras,
+remotes — need no observation.
+
 ### Read values once
 
 A subscription keeps values fresh for as long as the system runs. For a

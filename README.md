@@ -34,7 +34,7 @@ integration.
 | `GrentonRuntime` | done (session, transports, state store) | §5 |
 | `GrentonProvisioning` | done (Object Manager download, project-file import) | §4 |
 | `GrentonDevices` | done (descriptors, entities, physical objects, `GrentonSystem` facade) | §6 |
-| `GrentonKit` | the umbrella: one import for apps, `GrentonSystem(interfaceArchive:)` | §2 |
+| `GrentonKit` | the umbrella: one import for apps, `GrentonSystem(interfaceArchive:)`, `InterfaceStore` (the archive, kept safely) | §2 |
 | `GrentonSimulation` | the same entities without a CLU, for app tests | §2 |
 | `GrentonSwiftUI` | `Observed`: an entity a SwiftUI view follows (iOS 17 / macOS 14) | §2 |
 | [`Examples/`](#examples) | small programs using the library | — |
@@ -172,13 +172,17 @@ swift run grenton-cli --help
 
 ## Documentation
 
-The documentation site of the Swift implementation has three parts:
+The documentation site is published at
+<https://osieckiadam.github.io/grenton-core-swift/> on every release. It
+has three parts:
 
 - a landing page with installation instructions;
 - a Getting Started walkthrough;
-- the DocC API reference with its guides (Getting Started, Concepts, Observing State, Controlling Devices).
+- the DocC API reference with its guides (Getting Started, Concepts,
+  Observing State, Controlling Devices, Testing Your App, Connection
+  Lifecycle, Running on Apple Platforms) and the pages of every module.
 
-Build it and open it locally:
+To build and open it locally:
 
 ```sh
 scripts/docs.sh

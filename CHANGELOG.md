@@ -3,6 +3,14 @@
 Versions follow the specification the port implements; see README,
 "Versioning and stability".
 
+## Unreleased
+
+- Documentation: the landing page and Getting Started keep the archive
+  with `InterfaceStore` instead of a plain file; Observing State shows
+  `Observed` for SwiftUI; Running on Apple Platforms points to the store;
+  README links the published site. A merge that changes only
+  documentation or workflows is not a release.
+
 ## 0.12.2 — 2026-10-26
 
 - Follows spec 0.12.2 (suite 0.12.2, 254 cases): a rule-list row is

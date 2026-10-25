@@ -4,9 +4,10 @@ name: release
 # prepares it with scripts/release.sh (CHANGELOG heading, `from:` in the
 # documentation); this job checks that and tags, and fails when the
 # version is already tagged — a port-only fix after a tag needs a spec
-# bump, because the port's version is the spec's. The one exception: a
-# merge that changes nothing but the workflows under .github/ is not a
-# release and needs no tag.
+# bump, because the port's version is the spec's. The exception: a merge
+# that changes nothing but the workflows under .github/ or the
+# documentation (README, CHANGELOG, site/, docs/, the .docc catalogs) is
+# not a release and needs no tag — the site publishes from main anyway.
 on:
   push:
     branches: [main]
@@ -29,8 +30,8 @@ jobs:
         env: { V: "${{ steps.version.outputs.version }}" }
         run: |
           if git rev-parse -q --verify "refs/tags/$V" >/dev/null; then
-            if [ -z "$(git diff --name-only "$V" HEAD | grep -v '^\.github/')" ]; then
-              echo "only .github/ changed since $V: not a release, nothing to tag"
+            if [ -z "$(git diff --name-only "$V" HEAD | grep -vE '^(\.github/|site/|docs/|README\.md$|CHANGELOG\.md$|Sources/[^/]+/[^/]+\.docc/)')" ]; then
+              echo "only workflows and documentation changed since $V: not a release, nothing to tag"
               exit 0
             fi
             echo "::error::$V is already tagged; a merge into main must carry a new spec version"
