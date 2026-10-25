@@ -75,6 +75,26 @@ public struct RollerShutterV3ObjectDTO: Decodable, Sendable {
 /// mode/state controls and the rest are optional so an interface that
 /// omits them still maps. Set actions carry the `$value$` placeholder
 /// (spec §3.3).
+// EVENT_SCHEDULER object (spec §3.5): the EventScheduler virtual object's
+// features and methods. Required: state, ruleList, addRuleAction,
+// deleteRuleAction; the rest optional.
+/// The references of an event scheduler widget.
+public struct EventSchedulerObjectDTO: Decodable, Sendable {
+    public let state: ValueRefDTO
+    public let ruleList: ValueRefDTO
+    public let addRuleAction: ActionRefDTO
+    public let deleteRuleAction: ActionRefDTO
+    public let ruleCount: ValueRefDTO?
+    public let ruleSpace: ValueRefDTO?
+    public let nextRule: ValueRefDTO?
+    public let currentRule: ValueRefDTO?
+    public let startAction: ActionRefDTO?
+    public let stopAction: ActionRefDTO?
+    public let enableRuleAction: ActionRefDTO?
+    public let disableRuleAction: ActionRefDTO?
+    public let getRuleAction: ActionRefDTO?
+}
+
 public struct ThermostatV2ObjectDTO: Decodable, Sendable {
     public let currentTemperature: ValueRefDTO
     public let targetTemperature: ValueRefDTO

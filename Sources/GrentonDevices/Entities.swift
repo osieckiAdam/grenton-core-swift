@@ -91,6 +91,8 @@ public enum BoundEntity: Sendable {
     case sceneTrigger(SceneTriggerEntity)
     case camera(CameraEntity)
     case thermostat(ThermostatEntity)
+    case eventSchedule(EventScheduleEntity)
+    case tvRemote(TvRemoteEntity)
 
     /// The entity as ``GrentonEntity``, for its id and name.
     public var underlying: any GrentonEntity {
@@ -107,6 +109,8 @@ public enum BoundEntity: Sendable {
         case .sceneTrigger(let e): return e
         case .camera(let e): return e
         case .thermostat(let e): return e
+        case .eventSchedule(let e): return e
+        case .tvRemote(let e): return e
         }
     }
 
@@ -131,7 +135,8 @@ public enum BoundEntity: Sendable {
         case .cover(let e): return e.updates()
         case .stateSensor(let e): return e.updates()
         case .thermostat(let e): return e.updates()
-        case .trigger, .sceneTrigger, .camera: return nil
+        case .eventSchedule(let e): return e.updates()
+        case .trigger, .sceneTrigger, .camera, .tvRemote: return nil
         }
     }
 
@@ -198,6 +203,8 @@ package enum DeviceBinder {
                 case .trigger(let d): return .trigger(TriggerEntity(descriptor: d, context: context))
                 case .sceneTrigger(let d): return .sceneTrigger(SceneTriggerEntity(descriptor: d, context: context))
                 case .camera(let d): return .camera(CameraEntity(descriptor: d))
+                case .eventSchedule(let d): return .eventSchedule(EventScheduleEntity(descriptor: d, context: context))
+                case .tvRemote(let d): return .tvRemote(TvRemoteEntity(descriptor: d, context: context))
                 case .thermostat(let d): return .thermostat(ThermostatEntity(descriptor: d, context: context))
                 }
             }
@@ -810,6 +817,139 @@ extension ThermostatEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
 }
+extension EventScheduleEntity: GrentonEntity {
+    public var id: String { descriptor.id }
+    public var name: String { descriptor.name }
+}
+extension TvRemoteEntity: GrentonEntity {
+    public var id: String { descriptor.id }
+    public var name: String { descriptor.name }
+}
+
+/// An event scheduler: up to 16 rules, each a time of day on chosen weekdays, that fire an action on the CLU.
+///
+/// The CLU reports the rules as a list; add, delete, enable and disable them by number. A new rule shows up in ``rules`` with the next report.
+public final class EventScheduleEntity: Sendable {
+    /// What the scheduler is: its state references and actions.
+    public let descriptor: EventScheduleDescriptor
+    private let context: DeviceContext
+
+    init(descriptor: EventScheduleDescriptor, context: DeviceContext) {
+        self.descriptor = descriptor
+        self.context = context
+    }
+
+    private func rules(at ref: ValueRef?) -> [ScheduleRule]? {
+        guard let ref, case .string(let text)? = context.store.value(for: ref) else { return nil }
+        return ScheduleRule.rules(in: text)
+    }
+
+    /// Whether the scheduler fires its rules; `nil` until the CLU has reported it.
+    public var isActive: Bool? { truthy(context.store.value(for: descriptor.state)) }
+
+    /// The rules in the CLU's order (by their next firing time); `nil` until reported, or when the CLU reports none.
+    public var rules: [ScheduleRule]? { rules(at: descriptor.ruleList) }
+
+    /// How many rules the scheduler has; `nil` until reported, or when the interface does not expose it.
+    public var ruleCount: Int? { descriptor.ruleCount.flatMap { asInt(context.store.value(for: $0)) } }
+
+    /// How many more rules fit (of 16); `nil` until reported, or when the interface does not expose it.
+    public var freeRuleSlots: Int? { descriptor.ruleSpace.flatMap { asInt(context.store.value(for: $0)) } }
+
+    /// The rule that fires next; `nil` until reported, when none is due, or when the interface does not expose it.
+    public var nextRule: ScheduleRule? { rules(at: descriptor.nextRule)?.first }
+
+    /// The rule firing now; `nil` until reported, when none is running, or when the interface does not expose it.
+    public var currentRule: ScheduleRule? { rules(at: descriptor.currentRule)?.first }
+
+    /// Whether ``setActive(_:)`` has an effect.
+    public var supportsActivation: Bool { descriptor.startAction != nil && descriptor.stopAction != nil }
+    /// Whether ``enableRule(_:)`` and ``disableRule(_:)`` have an effect.
+    public var supportsEnabling: Bool { descriptor.enableRuleAction != nil && descriptor.disableRuleAction != nil }
+
+    /// Starts (`true`) or stops (`false`) the scheduler. Does nothing when ``supportsActivation`` is `false`.
+    public func setActive(_ active: Bool) async throws {
+        guard let action = active ? descriptor.startAction : descriptor.stopAction else { return }
+        try await context.executor.execute(action)
+    }
+
+    // The CRON text is a string with spaces and commas: §5.3.4 sends it
+    // quoted, exactly as the app does.
+    /// Adds a rule firing at `hour`:`minute` on `days`. Hour, minute or days out of range, or no days: nothing is sent and `false` is returned.
+    ///
+    /// The CLU numbers the rule; it appears in ``rules`` with the next report.
+    @discardableResult
+    public func addRule(hour: Int, minute: Int, days: Set<Weekday>) async throws -> Bool {
+        guard let cron = ScheduleRule.cron(hour: hour, minute: minute, days: days) else { return false }
+        try await context.executor.execute(descriptor.addRuleAction.withValue(cron))
+        return true
+    }
+
+    /// Deletes the rule with that number (1–16).
+    public func deleteRule(_ id: Int) async throws {
+        try await context.executor.execute(descriptor.deleteRuleAction.withValue("\(id)"))
+    }
+
+    /// Enables the rule with that number. Does nothing when ``supportsEnabling`` is `false`.
+    public func enableRule(_ id: Int) async throws {
+        guard let action = descriptor.enableRuleAction else { return }
+        try await context.executor.execute(action.withValue("\(id)"))
+    }
+
+    /// Disables the rule with that number. Does nothing when ``supportsEnabling`` is `false`.
+    public func disableRule(_ id: Int) async throws {
+        guard let action = descriptor.disableRuleAction else { return }
+        try await context.executor.execute(action.withValue("\(id)"))
+    }
+
+    /// A stream that fires whenever the state or the rules change.
+    public func updates() -> AsyncStream<Void> {
+        filteredUpdates(keys: Set(EntityDescriptor.eventSchedule(descriptor).stateRefs), store: context.store)
+    }
+}
+
+/// A TV remote: named buttons, each sending an action to the CLU. No state.
+public final class TvRemoteEntity: Sendable {
+    /// What the remote is: its buttons and their actions.
+    public let descriptor: TvRemoteDescriptor
+    private let context: DeviceContext
+
+    init(descriptor: TvRemoteDescriptor, context: DeviceContext) {
+        self.descriptor = descriptor
+        self.context = context
+    }
+
+    /// The buttons this remote has; empty until buttons are assigned in Object Manager.
+    public var buttons: Set<TvRemoteButton> { Set(descriptor.buttons.keys) }
+
+    /// The label of the VOD button.
+    public var vodLabel: String { descriptor.vodLabel }
+
+    /// Presses a button. Does nothing for a button the remote does not have.
+    public func press(_ button: TvRemoteButton) async throws {
+        guard let action = descriptor.buttons[button] else { return }
+        try await context.executor.execute(action)
+    }
+}
+
+/// An entity with state the CLU reports: it can tell you when that state changed.
+///
+/// Every entity with `updates()` conforms; buttons, scenes, cameras and remotes have no state.
+public protocol StatefulEntity: GrentonEntity {
+    /// A stream that fires whenever the state changes; read the entity for the new values.
+    func updates() -> AsyncStream<Void>
+}
+
+extension ToggleEntity: StatefulEntity {}
+extension DimmableLightEntity: StatefulEntity {}
+extension HsbLightEntity: StatefulEntity {}
+extension ContactSensorEntity: StatefulEntity {}
+extension SensorEntity: StatefulEntity {}
+extension NumberSettingEntity: StatefulEntity {}
+extension CoverEntity: StatefulEntity {}
+extension StateSensorEntity: StatefulEntity {}
+extension ThermostatEntity: StatefulEntity {}
+extension EventScheduleEntity: StatefulEntity {}
 
 extension ToggleEntity: SwitchableEntity {}
 extension DimmableLightEntity: SwitchableEntity {}

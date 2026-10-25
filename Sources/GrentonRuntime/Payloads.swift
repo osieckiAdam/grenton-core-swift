@@ -144,7 +144,11 @@ package enum Payloads {
     /// The value list between the outer braces (spec §5.3.2 pt 2): elements
     /// separated by commas outside quoted text and outside nested braces,
     /// each trimmed, quote-stripped and cast. A nested `{…}` block is one
-    /// element and casts to a string. `nil` for an unclosed string, a
+    /// element and casts to a string. Quoted text that begins with `"{` is
+    /// a Lua table the CLU serialized (an event scheduler's rule list has
+    /// quotes and commas inside): it runs to the brace balancing its first
+    /// one, which must be followed by the closing quote; without such a
+    /// brace the plain rule applies. `nil` for an unclosed string, a
     /// closing brace at depth 0, or an unclosed nested brace.
     private static func parseValueList(_ body: Substring) -> [GrentonValue]? {
         let content = body.dropFirst().dropLast()
@@ -153,9 +157,18 @@ package enum Payloads {
         var start = content.startIndex
         var depth = 0
         var inText = false
-        for index in content.indices {
+        var index = content.startIndex
+        while index < content.endIndex {
             switch content[index] {
-            case "\"": inText.toggle()
+            case "\"" where !inText:
+                let next = content.index(after: index)
+                if next < content.endIndex, content[next] == "{",
+                   let closing = quotedTableEnd(content, from: next) {
+                    index = closing   // the closing quote; the loop steps past it
+                } else {
+                    inText = true
+                }
+            case "\"": inText = false
             case "{" where !inText: depth += 1
             case "}" where !inText:
                 guard depth > 0 else { return nil }
@@ -165,6 +178,7 @@ package enum Payloads {
                 start = content.index(after: index)
             default: break
             }
+            index = content.index(after: index)
         }
         guard !inText, depth == 0 else { return nil }
         elements.append(content[start...])
@@ -172,6 +186,28 @@ package enum Payloads {
         // GrentonValue(wireString:) — the reference applies both passes
         // (client_register.py + cast), so `" ON "` becomes string "ON".
         return elements.map { GrentonValue(wireString: trimAndStripQuotes($0)) }
+    }
+
+    /// The index of the `"` that closes a quoted table whose first `{` is at
+    /// `open`: the brace balancing it, ignoring quotes in between, followed
+    /// by `"`. `nil` when no such pair exists before the end.
+    private static func quotedTableEnd(_ content: Substring, from open: Substring.Index) -> Substring.Index? {
+        var depth = 0
+        var index = open
+        while index < content.endIndex {
+            switch content[index] {
+            case "{": depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 {
+                    let next = content.index(after: index)
+                    return next < content.endIndex && content[next] == "\"" ? next : nil
+                }
+            default: break
+            }
+            index = content.index(after: index)
+        }
+        return nil
     }
 
     /// Python `value.strip().strip('"')` — whitespace first, then every

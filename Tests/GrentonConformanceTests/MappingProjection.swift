@@ -126,6 +126,25 @@ enum MappingProjection {
             o["mode"] = control(d.mode)
             o["power"] = control(d.power)
             o["output"] = d.output.map(valueRef) ?? .null
+        case .eventSchedule(let d):
+            o["kind"] = "eventSchedule"
+            o["state"] = valueRef(d.state)
+            o["ruleList"] = valueRef(d.ruleList)
+            o["addRuleAction"] = action(d.addRuleAction)
+            o["deleteRuleAction"] = action(d.deleteRuleAction)
+            o["ruleCount"] = d.ruleCount.map(valueRef) ?? .null
+            o["ruleSpace"] = d.ruleSpace.map(valueRef) ?? .null
+            o["nextRule"] = d.nextRule.map(valueRef) ?? .null
+            o["currentRule"] = d.currentRule.map(valueRef) ?? .null
+            o["startAction"] = d.startAction.map(action) ?? .null
+            o["stopAction"] = d.stopAction.map(action) ?? .null
+            o["enableRuleAction"] = d.enableRuleAction.map(action) ?? .null
+            o["disableRuleAction"] = d.disableRuleAction.map(action) ?? .null
+        case .tvRemote(let d):
+            o["kind"] = "tvRemote"
+            var buttons: [String: JSON] = [:]
+            for (button, a) in d.buttons { buttons[button.rawValue] = action(a) }
+            o["buttons"] = .object(buttons)
         }
         return .object(o)
     }

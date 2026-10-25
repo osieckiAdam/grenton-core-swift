@@ -122,6 +122,34 @@ enum Operations {
                 "mapping": MappingProjection.interface(interface),
             ])
         },
+        "schedule.rules": { input in
+            guard let rules = ScheduleRule.rules(in: try input.string("text")) else { return ok(["rules": .null]) }
+            func project(_ r: ScheduleRule) -> JSON {
+                var o: [String: JSON] = ["id": .number(Double(r.id)), "isEnabled": .bool(r.isEnabled), "cron": .string(r.cron)]
+                o["hour"] = r.hour.map { JSON.number(Double($0)) } ?? .null
+                o["minute"] = r.minute.map { JSON.number(Double($0)) } ?? .null
+                if let days = r.days {
+                    let numbers: [JSON] = days.map(\.rawValue).sorted().map { JSON.number(Double($0)) }
+                    o["days"] = .array(numbers)
+                } else {
+                    o["days"] = .null
+                }
+                return .object(o)
+            }
+            return ok(["rules": .array(rules.map(project))])
+        },
+        "schedule.cron": { input in
+            guard let hour = input["hour"]?.intValue, let minute = input["minute"]?.intValue,
+                  case .array(let dayValues)? = input["days"] else { throw SuiteError("schedule.cron: bad input") }
+            // A day outside 0–6 is a reject, like any out-of-range input.
+            var days: Set<Weekday> = []
+            for value in dayValues {
+                guard let raw = value.intValue, let day = Weekday(rawValue: raw) else { return reject }
+                days.insert(day)
+            }
+            guard let text = ScheduleRule.cron(hour: hour, minute: minute, days: days) else { return reject }
+            return ok(["text": .string(text)])
+        },
         "number.format": { input in
             guard case .double(let value) = try untagged(input["value"]),
                   let precision = input["precision"]?.intValue else {

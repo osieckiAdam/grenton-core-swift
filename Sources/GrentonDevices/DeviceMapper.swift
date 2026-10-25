@@ -67,6 +67,8 @@ public enum DeviceMapper {
         case .scene, .sceneDouble: return .scene
         case .camera: return .camera
         case .thermostatV2: return .thermostat
+        case .eventScheduler: return .eventSchedule
+        case .tvRemoteControl: return .tvRemote
         }
     }
 
@@ -85,6 +87,8 @@ public enum DeviceMapper {
         case .multisensor(let w): return w.label
         case .rollerShutterV3(let w): return w.label
         case .thermostatV2(let w): return w.label
+        case .eventScheduler(let w): return w.label
+        case .tvRemoteControl(let w): return w.label
         case .valueDouble(let w): return joined([w.componentLeft.label, w.componentRight.label])
         case .contactSensorDouble(let w): return joined([w.componentLeft.label, w.componentRight.label])
         case .onOff(let w): return joined(w.components.map(\.label))
@@ -283,6 +287,30 @@ public enum DeviceMapper {
                 mode: control(o.mode, o.setModeAction),
                 power: control(o.state, o.setStateAction),
                 output: o.controlOutValue.map(ValueRef.init(dto:))))]
+
+        case .eventScheduler(let w):
+            let o = w.object
+            guard let add = try? ActionRef(dto: o.addRuleAction),
+                  let delete = try? ActionRef(dto: o.deleteRuleAction) else { return [] }
+            func optional(_ action: ActionRefDTO?) -> ActionRef? { action.flatMap { try? ActionRef(dto: $0) } }
+            return [.eventSchedule(EventScheduleDescriptor(
+                id: "\(w.id)_0", name: w.label,
+                state: ValueRef(dto: o.state), ruleList: ValueRef(dto: o.ruleList),
+                addRuleAction: add, deleteRuleAction: delete,
+                ruleCount: o.ruleCount.map(ValueRef.init(dto:)), ruleSpace: o.ruleSpace.map(ValueRef.init(dto:)),
+                nextRule: o.nextRule.map(ValueRef.init(dto:)), currentRule: o.currentRule.map(ValueRef.init(dto:)),
+                startAction: optional(o.startAction), stopAction: optional(o.stopAction),
+                enableRuleAction: optional(o.enableRuleAction), disableRuleAction: optional(o.disableRuleAction)))]
+
+        case .tvRemoteControl(let w):
+            // Names outside the catalog and entries that are not actions
+            // are left out; the entity exists even with none (spec §6.3.14).
+            var buttons: [TvRemoteButton: ActionRef] = [:]
+            for (name, dto) in w.buttons {
+                guard let button = TvRemoteButton(rawValue: name), let action = try? ActionRef(dto: dto) else { continue }
+                buttons[button] = action
+            }
+            return [.tvRemote(TvRemoteDescriptor(id: "\(w.id)_0", name: w.label, vodLabel: w.vodLabel, buttons: buttons))]
         }
     }
 

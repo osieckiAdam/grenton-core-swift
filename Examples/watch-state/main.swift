@@ -54,8 +54,9 @@ func state(of entity: BoundEntity) -> String? {
     case .numberSetting(let e): return show(e.value)
     case .cover(let e): return "position \(show(e.position)), \(e.motion)"
     case .stateSensor(let e): return "\(e.state)"
+    case .eventSchedule(let e): return "\(show(e.isActive.map { $0 ? "active" : "stopped" })), \(show(e.rules?.count)) rule(s)"
     case .thermostat(let e): return "\(show(e.currentTemperature)) °C, target \(show(e.targetTemperature)) °C"
-    case .trigger, .sceneTrigger, .camera: return nil
+    case .trigger, .sceneTrigger, .camera, .tvRemote: return nil
     // BoundEntity is @nonexhaustive: a newer library may add a kind.
     @unknown default: return "(unsupported kind)"
     }

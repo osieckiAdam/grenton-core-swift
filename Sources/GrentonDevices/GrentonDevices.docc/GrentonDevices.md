@@ -64,6 +64,15 @@ others.
 - ``TriggerEntity``
 - ``SceneTriggerEntity``
 - ``CameraEntity``
+- ``EventScheduleEntity``
+- ``TvRemoteEntity``
+- ``StatefulEntity``
+
+### Schedules and Remotes
+
+- ``ScheduleRule``
+- ``Weekday``
+- ``TvRemoteButton``
 
 ### Physical Objects
 

@@ -4,6 +4,10 @@ Everything an app needs, in one import.
 
 ## Overview
 
+``InterfaceStore`` keeps the downloaded archive between runs in the one
+right place — a protected file — and starts the system from it.
+
+
 `import GrentonKit` brings in `GrentonModel`, `GrentonRuntime`,
 `GrentonProvisioning` and `GrentonDevices`, plus the conveniences that
 join them: creating a `GrentonSystem` straight from an interface archive.
@@ -28,3 +32,10 @@ which reads the archive `ProvisioningClient` downloaded (or one saved
 earlier) and creates the system from it — the `GrentonDevices` initializer
 takes a parsed interface instead. For the devices without a connection, see
 `GrentonSimulation`.
+
+## Topics
+
+### Keeping the interface
+
+- ``InterfaceStore``
+- ``InterfaceStoreError``

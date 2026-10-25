@@ -65,3 +65,38 @@ if case .sceneTrigger(let scene) = entity {
     try await scene.run()
 }
 ```
+
+### Schedules
+
+An event scheduler holds up to 16 rules, each a time of day on chosen
+weekdays. The CLU reports them as a list; add and delete them by number:
+
+```swift
+if case .eventSchedule(let schedule) = entity {
+    for rule in schedule.rules ?? [] {
+        print(rule.id, rule.isEnabled, rule.hour ?? 0, rule.minute ?? 0, rule.days ?? [])
+    }
+    try await schedule.addRule(hour: 22, minute: 30, days: [.saturday, .sunday])
+    if let stale = schedule.rules?.first(where: { !$0.isEnabled }) {
+        try await schedule.deleteRule(stale.id)
+    }
+}
+```
+
+A new rule gets its number from the CLU and shows up in
+``EventScheduleEntity/rules`` with the next report. ``ScheduleRule/days``
+is `nil` for a rule written in Object Manager with CRON features the app
+does not use (a day of month, a step); ``ScheduleRule/cron`` always has
+the text.
+
+### TV remotes
+
+```swift
+if case .tvRemote(let remote) = entity, remote.buttons.contains(.volumeUp) {
+    try await remote.press(.volumeUp)
+}
+```
+
+A remote may have no buttons at all until they are assigned in Object
+Manager; ``TvRemoteEntity/press(_:)`` does nothing for a button the remote
+does not have.
