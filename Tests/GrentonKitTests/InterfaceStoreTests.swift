@@ -41,3 +41,18 @@ import GrentonKit
         #expect(try store.isNewer(try fixture("interface-newer")))
     }
 }
+
+@Suite struct InterfaceStoreDefaultLocationTests {
+    @Test func theDefaultStoreIsScopedToTheApp() throws {
+        // Two apps never share the archive and its key: the default path
+        // carries the bundle identifier, and a process without one (this
+        // test runner, a command-line tool) gets no default at all.
+        if let bundle = Bundle.main.bundleIdentifier, !bundle.isEmpty {
+            let store = try InterfaceStore()
+            #expect(store.url.pathComponents.contains(bundle))
+            #expect(store.url.lastPathComponent == "interface.zip")
+        } else {
+            #expect(throws: InterfaceStoreError.noBundleIdentifier) { try InterfaceStore() }
+        }
+    }
+}

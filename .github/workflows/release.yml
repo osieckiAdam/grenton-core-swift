@@ -12,6 +12,8 @@ on:
     branches: [main]
 permissions:
   contents: write
+# One release at a time: two merges in quick succession must tag in order.
+concurrency: { group: release }
 jobs:
   tag:
     runs-on: ubuntu-latest

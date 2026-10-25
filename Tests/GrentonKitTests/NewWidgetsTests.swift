@@ -55,7 +55,7 @@ import GrentonSimulation
         #expect(simulation.executedActions.last?.value == "4")
         try await schedule.setActive(false)
         #expect(simulation.executedActions.last == schedule.descriptor.stopAction)
-        #expect(!schedule.supportsEnabling)
+        #expect(!schedule.supportsEnablingRules && schedule.supportsStarting)
         try await schedule.enableRule(1)   // no-op without the action
         #expect(simulation.executedActions.count == 3)
     }

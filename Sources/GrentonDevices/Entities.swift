@@ -862,12 +862,16 @@ public final class EventScheduleEntity: Sendable {
     /// The rule firing now; `nil` until reported, when none is running, or when the interface does not expose it.
     public var currentRule: ScheduleRule? { rules(at: descriptor.currentRule)?.first }
 
-    /// Whether ``setActive(_:)`` has an effect.
-    public var supportsActivation: Bool { descriptor.startAction != nil && descriptor.stopAction != nil }
-    /// Whether ``enableRule(_:)`` and ``disableRule(_:)`` have an effect.
-    public var supportsEnabling: Bool { descriptor.enableRuleAction != nil && descriptor.disableRuleAction != nil }
+    /// Whether `setActive(true)` has an effect.
+    public var supportsStarting: Bool { descriptor.startAction != nil }
+    /// Whether `setActive(false)` has an effect.
+    public var supportsStopping: Bool { descriptor.stopAction != nil }
+    /// Whether ``enableRule(_:)`` has an effect.
+    public var supportsEnablingRules: Bool { descriptor.enableRuleAction != nil }
+    /// Whether ``disableRule(_:)`` has an effect.
+    public var supportsDisablingRules: Bool { descriptor.disableRuleAction != nil }
 
-    /// Starts (`true`) or stops (`false`) the scheduler. Does nothing when ``supportsActivation`` is `false`.
+    /// Starts (`true`) or stops (`false`) the scheduler. Does nothing when the interface has no action for that direction (``supportsStarting``, ``supportsStopping``).
     public func setActive(_ active: Bool) async throws {
         guard let action = active ? descriptor.startAction : descriptor.stopAction else { return }
         try await context.executor.execute(action)
@@ -890,13 +894,13 @@ public final class EventScheduleEntity: Sendable {
         try await context.executor.execute(descriptor.deleteRuleAction.withValue("\(id)"))
     }
 
-    /// Enables the rule with that number. Does nothing when ``supportsEnabling`` is `false`.
+    /// Enables the rule with that number. Does nothing when ``supportsEnablingRules`` is `false`.
     public func enableRule(_ id: Int) async throws {
         guard let action = descriptor.enableRuleAction else { return }
         try await context.executor.execute(action.withValue("\(id)"))
     }
 
-    /// Disables the rule with that number. Does nothing when ``supportsEnabling`` is `false`.
+    /// Disables the rule with that number. Does nothing when ``supportsDisablingRules`` is `false`.
     public func disableRule(_ id: Int) async throws {
         guard let action = descriptor.disableRuleAction else { return }
         try await context.executor.execute(action.withValue("\(id)"))
