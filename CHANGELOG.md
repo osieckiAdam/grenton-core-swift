@@ -16,7 +16,9 @@ Versions follow the specification the port implements; see README,
 - `StrictJSONParser` accepts 64 levels of nesting instead of 512: the
   deeper limit let a crafted project file overflow the stack of a
   secondary thread in a debug build before the limit was reached.
-- Follows spec 0.11.1 (suite 0.11.1, unchanged cases). An entity's
+- Follows spec 0.11.2 (suite 0.11.2, 233 cases: a project node of ten
+  thousand nested arrays is `invalidData`; a stopped session takes no
+  datagram). An entity's
   `updates()` can no longer lose a signal: the store filters by key under
   its lock and keeps a flag per subscriber, instead of a forwarding task
   over the shared, bounded change stream, where a burst of other keys'
