@@ -3,6 +3,20 @@
 Versions follow the specification the port implements; see README,
 "Versioning and stability".
 
+## Unreleased
+
+- Follows spec 0.12.2 (suite 0.12.2, 254 cases): a rule-list row is
+  exactly `{int, int, "text"}` — a missing separator, an empty or a
+  trailing field makes the whole list unknown — and an empty item in a
+  weekday list puts the rule outside the subset. Review findings (Codex)
+  on 0.12.1: `EventScheduleEntity` reports each optional control on its
+  own (`supportsStarting`, `supportsStopping`, `supportsEnablingRules`,
+  `supportsDisablingRules`); `InterfaceStore()` keeps the archive under
+  the app's bundle identifier and throws `noBundleIdentifier` in a process
+  without one; the SwiftUI test observes through `withObservationTracking`
+  and checks the wrapper is released; the release workflow runs one at a
+  time.
+
 ## 0.12.1 — 2026-10-25
 
 - Follows spec 0.12.1 (suite 0.12.1, 249 cases). Two widget types v1 left

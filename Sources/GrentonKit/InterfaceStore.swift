@@ -38,11 +38,16 @@ public struct InterfaceStore: Sendable {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
     }
 
-    /// The default store: `interface.zip` in the app's Application Support directory, under `Grenton`.
+    /// The default store: `interface.zip` in the app's own folder under Application Support.
+    ///
+    /// The folder is named after the app's bundle identifier, so two apps on one Mac never share an archive (and its key). A process without a bundle identifier — a command-line tool — has no default place: give one with ``init(url:)``.
+    /// - Throws: `InterfaceStoreError.noBundleIdentifier` when the process has none.
     public init() throws {
+        guard let bundle = Bundle.main.bundleIdentifier, !bundle.isEmpty else { throw InterfaceStoreError.noBundleIdentifier }
         let base = try FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-        try self.init(url: base.appendingPathComponent("Grenton", isDirectory: true).appendingPathComponent("interface.zip"))
+        try self.init(url: base.appendingPathComponent(bundle, isDirectory: true)
+            .appendingPathComponent("Grenton", isDirectory: true).appendingPathComponent("interface.zip"))
     }
 
     /// Saves an archive, as `ProvisioningClient.fetchInterfaceArchive(pin:)` returns it. It is parsed first: an archive that is not an interface is not saved.
@@ -95,4 +100,6 @@ public struct InterfaceStore: Sendable {
 public enum InterfaceStoreError: Error, Sendable, Equatable {
     /// `system()` was called before any archive was saved.
     case nothingSaved
+    /// `init()` was called in a process without a bundle identifier; use `init(url:)`.
+    case noBundleIdentifier
 }

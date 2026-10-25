@@ -64,7 +64,7 @@ public struct ScheduleRule: Sendable, Equatable, Identifiable {
     public static func rules(in text: String) -> [ScheduleRule]? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.hasPrefix("{"), trimmed.hasSuffix("}") else { return nil }
-        let inner = trimmed.dropFirst().dropLast()
+        let inner = Substring(trimmed.dropFirst().dropLast().trimmingCharacters(in: .whitespacesAndNewlines))
         if inner.first == "{" {
             // A list of rows: split on commas at depth 0 outside quotes.
             var rows: [Substring] = []
@@ -82,21 +82,24 @@ public struct ScheduleRule: Sendable, Equatable, Identifiable {
             }
             guard depth == 0, !inText else { return nil }
             rows.append(inner[start...])
-            let parsed = rows.compactMap { parseRow(String($0).trimmingCharacters(in: .whitespaces)) }
+            let parsed = rows.compactMap { parseRow(String($0).trimmingCharacters(in: .whitespacesAndNewlines)) }
             return parsed.count == rows.count && !parsed.isEmpty ? parsed : nil
         }
         return parseRow(trimmed).map { [$0] }
     }
 
-    /// `{id, enabled, "cron"}` → a rule.
+    /// `{id, enabled, "cron"}` → a rule: exactly two integers and one
+    /// quoted text, comma-separated, whitespace allowed outside the quotes,
+    /// nothing after the text (spec §6.3.13).
     private static func parseRow(_ row: String) -> ScheduleRule? {
         guard row.hasPrefix("{"), row.hasSuffix("}") else { return nil }
         let inner = row.dropFirst().dropLast()
-        // id and enabled are the two fields before the quoted cron.
-        guard let quote = inner.firstIndex(of: "\""), let last = inner.lastIndex(of: "\""), quote < last else { return nil }
-        let head = inner[..<quote].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        guard head.count == 2, let id = Int(head[0]), let enabled = Int(head[1]) else { return nil }
+        guard let quote = inner.firstIndex(of: "\""), let last = inner.lastIndex(of: "\""), quote < last,
+              inner[inner.index(after: last)...].allSatisfy(\.isWhitespace) else { return nil }
+        // Two fields, each a bare integer, each followed by its comma.
+        let head = inner[..<quote].split(separator: ",", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard head.count == 3, head[2].isEmpty, let id = Int(head[0]), let enabled = Int(head[1]) else { return nil }
         let cron = String(inner[inner.index(after: quote)..<last])
         return ScheduleRule(id: id, isEnabled: enabled == 1, cron: cron)
     }
@@ -110,7 +113,8 @@ public struct ScheduleRule: Sendable, Equatable, Identifiable {
               let hour = Int(fields[1]), (0...23).contains(hour) else { return nil }
         if fields[4] == "*" { return (hour, minute, Set(Weekday.allCases)) }
         var days: Set<Weekday> = []
-        for item in fields[4].split(separator: ",") {
+        // An empty item (`1,,2`, `,1`, `1,`) is outside the subset.
+        for item in fields[4].split(separator: ",", omittingEmptySubsequences: false) {
             let bounds = item.split(separator: "-", omittingEmptySubsequences: false)
             guard bounds.count <= 2, let low = Int(bounds[0]), let high = Int(bounds.last!),
                   (0...7).contains(low), (0...7).contains(high), low <= high else { return nil }
