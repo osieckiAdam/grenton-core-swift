@@ -39,7 +39,6 @@ integration.
 | `GrentonSwiftUI` | `Observed`: an entity a SwiftUI view follows (iOS 17 / macOS 14) | §2 |
 | [`Examples/`](#examples) | small programs using the library | — |
 | [Documentation](#documentation) | DocC reference and guides | — |
-| [`grenton-cli`](#grenton-cli) | smoke tool for live installations | — |
 
 ## Quick start: try it against your installation
 
@@ -158,17 +157,6 @@ swift run set-thermostat dist/interface.zip THE1001 21
 `set-thermostat` reads the current target first, writes nothing if it
 cannot, and prints the command that restores the previous value. Object
 names such as `THE1001` (yours will differ) are in the output of `list-devices`.
-
-## grenton-cli
-
-`grenton-cli` is a smoke tool that does all of the above behind options
-(`--save-interface`, `--interface-file`, `--watch`, `--on`/`--off`,
-`--set-temperature`, `--any-source` for multi-homed CLUs). It stays in this
-repository until it moves to a repository of its own.
-
-```sh
-swift run grenton-cli --help
-```
 
 ## Documentation
 
