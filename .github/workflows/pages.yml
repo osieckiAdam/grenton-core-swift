@@ -1,0 +1,30 @@
+name: pages
+# Publishes the documentation site (site/ plus the DocC reference) to
+# GitHub Pages after every release: the tag the release workflow pushes.
+on:
+  push:
+    tags: ["[0-9]*"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency: { group: pages, cancel-in-progress: true }
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: true }
+      - uses: maxim-lobanov/setup-xcode@v1
+        with: { xcode-version: latest-stable }
+      - run: BASE_PATH=grenton-core-swift/ scripts/docs.sh build
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: .build/site }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: "${{ steps.deployment.outputs.page_url }}" }
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

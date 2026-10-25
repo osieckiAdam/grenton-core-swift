@@ -72,6 +72,10 @@ public enum DeviceKind: String, Sendable, CaseIterable {
     case camera
     /// A thermostat.
     case thermostat
+    /// An event scheduler: rules that fire at a time of day on chosen weekdays.
+    case eventSchedule
+    /// A TV remote: a set of buttons.
+    case tvRemote
 }
 
 /// An entity as plain data: what it reads and which actions it sends. `GrentonSystem` turns it into a live ``BoundEntity``.
@@ -89,6 +93,8 @@ public enum EntityDescriptor: Identifiable, Sendable {
     case sceneTrigger(SceneTriggerDescriptor)
     case camera(CameraDescriptor)
     case thermostat(ThermostatDescriptor)
+    case eventSchedule(EventScheduleDescriptor)
+    case tvRemote(TvRemoteDescriptor)
 
     /// The stable id: the widget id plus a suffix.
     public var id: String {
@@ -105,6 +111,8 @@ public enum EntityDescriptor: Identifiable, Sendable {
         case .sceneTrigger(let d): return d.id
         case .camera(let d): return d.id
         case .thermostat(let d): return d.id
+        case .eventSchedule(let d): return d.id
+        case .tvRemote(let d): return d.id
         }
     }
 
@@ -123,6 +131,8 @@ public enum EntityDescriptor: Identifiable, Sendable {
         case .sceneTrigger(let d): return d.name
         case .camera(let d): return d.name
         case .thermostat(let d): return d.name
+        case .eventSchedule(let d): return d.name
+        case .tvRemote(let d): return d.name
         }
     }
 
@@ -143,7 +153,9 @@ public enum EntityDescriptor: Identifiable, Sendable {
         case .trigger(let d): return ObjectKey(d.action)
         case .sceneTrigger(let d): return ObjectKey(d.action)
         case .thermostat(let d): return ObjectKey(d.currentTemperature)
-        case .camera: return nil
+        case .eventSchedule(let d): return ObjectKey(d.state)
+        // A remote's buttons may each drive a different object (spec §6.6).
+        case .camera, .tvRemote: return nil
         }
     }
 
@@ -168,9 +180,64 @@ public enum EntityDescriptor: Identifiable, Sendable {
             var refs = [d.currentTemperature, d.targetTemperature]
             refs += [d.minTemperature, d.maxTemperature, d.mode?.state, d.power?.state, d.output].compactMap { $0 }
             return refs
-        case .trigger, .sceneTrigger, .camera: return []
+        case .eventSchedule(let d):
+            return [d.state, d.ruleList] + [d.ruleCount, d.ruleSpace, d.nextRule, d.currentRule].compactMap { $0 }
+        case .trigger, .sceneTrigger, .camera, .tvRemote: return []
         }
     }
+}
+
+// Event scheduler (spec §6.3.13).
+/// The description of an ``EventScheduleEntity``: its state references and actions.
+public struct EventScheduleDescriptor: Sendable {
+    /// The entity's stable id: the widget id plus a suffix.
+    public let id: String
+    /// The label from the mobile interface.
+    public let name: String
+    /// The State feature: 1 while the scheduler fires its rules.
+    public let state: ValueRef
+    /// The RuleList feature: every rule as the CLU serializes them.
+    public let ruleList: ValueRef
+    /// Adds a rule; its value is the CRON text.
+    public let addRuleAction: ActionRef
+    /// Deletes a rule by its number.
+    public let deleteRuleAction: ActionRef
+    /// The RuleCount feature, if the interface exposes it.
+    public let ruleCount: ValueRef?
+    /// The RuleAvailableCount feature (free of 16), if exposed.
+    public let ruleSpace: ValueRef?
+    /// The NextRule feature, if exposed.
+    public let nextRule: ValueRef?
+    /// The CurrentRule feature, if exposed.
+    public let currentRule: ValueRef?
+    /// Starts the scheduler, if the interface exposes it.
+    public let startAction: ActionRef?
+    /// Stops the scheduler, if exposed.
+    public let stopAction: ActionRef?
+    /// Enables a rule by its number, if exposed.
+    public let enableRuleAction: ActionRef?
+    /// Disables a rule by its number, if exposed.
+    public let disableRuleAction: ActionRef?
+}
+
+/// A button of a TV remote (spec §3.5).
+@nonexhaustive
+public enum TvRemoteButton: String, Sendable, CaseIterable {
+    case on, off, up, down, left, right, ok, menu, back, guide, play, pause
+    case fastForward, fastRewind, nextChannel, previousChannel, volumeUp, volumeDown, mute, vod, `init`
+}
+
+// TV remote (spec §6.3.14).
+/// The description of a ``TvRemoteEntity``: the actions behind its buttons.
+public struct TvRemoteDescriptor: Sendable {
+    /// The entity's stable id: the widget id plus a suffix.
+    public let id: String
+    /// The label from the mobile interface.
+    public let name: String
+    /// The label of the VOD button.
+    public let vodLabel: String
+    /// The buttons the remote has, with their actions; empty before any button is assigned in Object Manager.
+    public let buttons: [TvRemoteButton: ActionRef]
 }
 
 // MARK: - Concrete descriptors

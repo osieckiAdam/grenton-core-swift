@@ -20,6 +20,7 @@ let package = Package(
         .library(name: "GrentonDevices", targets: ["GrentonDevices"]),
         .library(name: "GrentonKit", targets: ["GrentonKit"]),
         .library(name: "GrentonSimulation", targets: ["GrentonSimulation"]),
+        .library(name: "GrentonSwiftUI", targets: ["GrentonSwiftUI"]),
     ],
     dependencies: [
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.19"),
@@ -36,6 +37,9 @@ let package = Package(
         // The same devices over an in-memory store, for app tests. Not part
         // of GrentonKit: a test target imports it on its own.
         .target(name: "GrentonSimulation", dependencies: ["GrentonModel", "GrentonRuntime", "GrentonDevices"]),
+        // Observation needs iOS 17 / macOS 14; the rest of the library does
+        // not, so the bridge is its own module, not part of GrentonKit.
+        .target(name: "GrentonSwiftUI", dependencies: ["GrentonDevices"]),
         .target(name: "GrentonTestSupport", dependencies: ["GrentonModel", "GrentonRuntime"]),
         .executableTarget(
             name: "grenton-cli",
@@ -140,6 +144,11 @@ let package = Package(
         .testTarget(
             name: "GrentonKitTests",
             dependencies: ["GrentonKit", "GrentonSimulation"],
+            resources: [.copy("Fixtures")]
+        ),
+        .testTarget(
+            name: "GrentonSwiftUITests",
+            dependencies: ["GrentonSwiftUI", "GrentonSimulation", "GrentonKit"],
             resources: [.copy("Fixtures")]
         ),
     ]

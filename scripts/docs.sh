@@ -47,7 +47,7 @@ trap 'restore_resolved; exit 143' TERM HUP
 GRENTON_DOCS=1 swift package --allow-writing-to-directory "$SITE/api" generate-documentation \
     --target GrentonModel --target GrentonRuntime \
     --target GrentonProvisioning --target GrentonDevices \
-    --target GrentonKit --target GrentonSimulation \
+    --target GrentonKit --target GrentonSimulation --target GrentonSwiftUI \
     --enable-experimental-combined-documentation --include-extended-types \
     --transform-for-static-hosting --warnings-as-errors \
     --experimental-enable-custom-templates \
@@ -65,7 +65,9 @@ find "$SITE/api" -name index.html -exec sed -i '' "s#__BASE__#/${BASE_PATH}#g" {
 for page in index.html getting-started/index.html \
     api/documentation/grentondevices/index.html \
     api/documentation/grentonkit/index.html \
-    api/documentation/grentonsimulation/simulatedgrentonsystem/index.html; do
+    api/documentation/grentonsimulation/simulatedgrentonsystem/index.html \
+    api/documentation/grentonswiftui/observed/index.html \
+    api/documentation/grentonkit/interfacestore/index.html; do
     if [ ! -f "$SITE/$page" ]; then
         echo "error: $page was not generated (see the output above)" >&2
         exit 1

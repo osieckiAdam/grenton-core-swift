@@ -3,6 +3,26 @@
 Versions follow the specification the port implements; see README,
 "Versioning and stability".
 
+## Unreleased
+
+- Follows spec 0.12.1 (suite 0.12.1, 249 cases). Two widget types v1 left
+  out are devices now: `EVENT_SCHEDULER` → `EventScheduleEntity` (rules as
+  `ScheduleRule`, `addRule(hour:minute:days:)`, `deleteRule`, `enable`/
+  `disableRule`, `setActive`) and `TV_REMOTE_CONTROL` → `TvRemoteEntity`
+  (`buttons`, `press(_:)`, also a remote without buttons). The report and
+  values parser reads a Lua table serialized into a quoted string (a
+  scheduler's rule list has quotes and commas inside); before, a rule on
+  chosen weekdays made every value of the reply `failed` (spec §5.3.2).
+- `GrentonSwiftUI`: `Observed<Entity>`, an `@Observable` wrapper a SwiftUI
+  view reads so it re-renders on every change the CLU reports (iOS 17 /
+  macOS 14; its own module, not part of `GrentonKit`). Every entity with
+  state conforms to the new `StatefulEntity`.
+- `GrentonKit.InterfaceStore`: keeps the interface archive in a protected
+  file in Application Support (complete file protection on iOS), loads it,
+  tells a newer export apart by `version`, and builds the system from it.
+- The documentation site is published to GitHub Pages by the `pages`
+  workflow on every release.
+
 ## 0.11.2 — 2026-10-25
 
 - Requires Swift 6.2.3 (Xcode 26.2) to build; apps still run on iOS 16 /

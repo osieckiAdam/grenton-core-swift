@@ -121,6 +121,45 @@ public struct ThermostatV2WidgetDTO: Decodable, Sendable {
     public let object: ThermostatV2ObjectDTO
 }
 
+// EVENT_SCHEDULER (spec §3.5).
+/// An event scheduler widget: CRON rules on the EventScheduler virtual object.
+public struct EventSchedulerWidgetDTO: Decodable, Sendable {
+    public let id: String
+    public let label: String
+    public let icon: String
+    public let object: EventSchedulerObjectDTO
+}
+
+// TV_REMOTE_CONTROL (spec §3.5): `object` maps button names to actions.
+// Any subset, also none; an entry that is not an action is left out
+// rather than failing the widget (§6.3.14).
+/// A TV remote widget: named buttons, each an action.
+public struct TvRemoteControlWidgetDTO: Decodable, Sendable {
+    public let id: String
+    public let label: String
+    public let icon: String
+    public let vodLabel: String
+    /// The entries of `object` that parse as actions, by button name.
+    public let buttons: [String: ActionRefDTO]
+
+    enum CodingKeys: String, CodingKey { case id, label, icon, vodLabel, object }
+
+    private struct Lenient: Decodable {
+        let action: ActionRefDTO?
+        init(from decoder: Decoder) throws { action = try? ActionRefDTO(from: decoder) }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        label = try c.decode(String.self, forKey: .label)
+        icon = try c.decode(String.self, forKey: .icon)
+        vodLabel = try c.decode(String.self, forKey: .vodLabel)
+        let raw = try c.decode([String: Lenient].self, forKey: .object)
+        buttons = raw.compactMapValues(\.action)
+    }
+}
+
 // MARK: - Union
 
 /// One widget of the interface, by type.
@@ -142,6 +181,8 @@ public enum WidgetDTO: Decodable, Sendable {
     case scene(SceneWidgetDTO)
     case sceneDouble(SceneDoubleWidgetDTO)
     case thermostatV2(ThermostatV2WidgetDTO)
+    case eventScheduler(EventSchedulerWidgetDTO)
+    case tvRemoteControl(TvRemoteControlWidgetDTO)
 
     /// Known widget types that are pure UI layout (section headers): they
     /// produce no device and are not reported as skipped (spec §3.5).
@@ -167,6 +208,8 @@ public enum WidgetDTO: Decodable, Sendable {
         case "SCENE": self = .scene(try SceneWidgetDTO(from: decoder))
         case "SCENE_DOUBLE": self = .sceneDouble(try SceneDoubleWidgetDTO(from: decoder))
         case "THERMOSTAT_V2": self = .thermostatV2(try ThermostatV2WidgetDTO(from: decoder))
+        case "EVENT_SCHEDULER": self = .eventScheduler(try EventSchedulerWidgetDTO(from: decoder))
+        case "TV_REMOTE_CONTROL": self = .tvRemoteControl(try TvRemoteControlWidgetDTO(from: decoder))
         default: throw GrentonModelError.unknownDiscriminator(type)
         }
     }
@@ -190,6 +233,8 @@ public enum WidgetDTO: Decodable, Sendable {
         case .scene: return "SCENE"
         case .sceneDouble: return "SCENE_DOUBLE"
         case .thermostatV2: return "THERMOSTAT_V2"
+        case .eventScheduler: return "EVENT_SCHEDULER"
+        case .tvRemoteControl: return "TV_REMOTE_CONTROL"
         }
     }
 
@@ -212,6 +257,8 @@ public enum WidgetDTO: Decodable, Sendable {
         case .scene(let w): return w.id
         case .sceneDouble(let w): return w.id
         case .thermostatV2(let w): return w.id
+        case .eventScheduler(let w): return w.id
+        case .tvRemoteControl(let w): return w.id
         }
     }
 }

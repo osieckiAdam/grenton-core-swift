@@ -36,6 +36,7 @@ integration.
 | `GrentonDevices` | done (descriptors, entities, physical objects, `GrentonSystem` facade) | §6 |
 | `GrentonKit` | the umbrella: one import for apps, `GrentonSystem(interfaceArchive:)` | §2 |
 | `GrentonSimulation` | the same entities without a CLU, for app tests | §2 |
+| `GrentonSwiftUI` | `Observed`: an entity a SwiftUI view follows (iOS 17 / macOS 14) | §2 |
 | [`Examples/`](#examples) | small programs using the library | — |
 | [Documentation](#documentation) | DocC reference and guides | — |
 | [`grenton-cli`](#grenton-cli) | smoke tool for live installations | — |
@@ -198,9 +199,9 @@ Network.framework and CommonCrypto, so there is no Linux build.
 Releases are tagged with the version of the specification they implement
 (`0.9.1` implements spec 0.9.1 and passes suite 0.9.1). Until 1.0 the
 package promises conformance with the spec, not a frozen API:
-`GrentonKit` (which re-exports `GrentonDevices` and `GrentonProvisioning`)
-and `GrentonSimulation` are what an app is meant to use and change
-deliberately; `GrentonModel` and `GrentonRuntime` are plumbing between
+`GrentonKit` (which re-exports `GrentonDevices` and `GrentonProvisioning`),
+`GrentonSimulation` and `GrentonSwiftUI` are what an app is meant to use
+and change deliberately; `GrentonModel` and `GrentonRuntime` are plumbing between
 them and may still change shape. The catalogue enums — `BoundEntity`,
 `EntityDescriptor`, `DeviceKind`, `WidgetDTO`, the error enums and the
 others that grow with Grenton's products — are `@nonexhaustive`
