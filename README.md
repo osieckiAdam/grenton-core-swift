@@ -4,10 +4,13 @@ Control a Grenton smart home from Swift on macOS and iOS: lights, shutters,
 thermostats, scenes and sensors, over the local network, the way the
 myGrenton app does.
 
+**Documentation:** <https://osieckiadam.github.io/grenton-core-swift/> —
+installation, a Getting Started walkthrough and the API reference.
+
 | | |
 |---|---|
 | **Local, no cloud** | Talks to the CLU controllers directly on your network, with their own encryption. |
-| **Every device** | Switches, dimmers, RGB lights, shutters, thermostats, scenes, sensors and cameras. |
+| **Every device** | Switches, dimmers, RGB lights, shutters, thermostats, scenes, sensors, cameras, schedules and TV remotes. |
 | **Always current** | CLUs push every change, so state stays up to date without polling. |
 | **Conformance-tested** | Implements the Grenton Core specification and passes its conformance suite. |
 
@@ -23,6 +26,7 @@ integration.
 
 ## Documents
 
+- [Documentation site](https://osieckiadam.github.io/grenton-core-swift/): the landing page, Getting Started and the DocC reference of every module, published from `main`.
 - [grenton-core-spec](https://github.com/osieckiAdam/grenton-core-spec): the language-agnostic specification and conformance suite. It is vendored at `vendor/grenton-core-spec` as a git submodule.
 - [`docs/grenton-core-swift-port.md`](docs/grenton-core-swift-port.md) — the Swift port plan: maintainers' notes, in Polish
 
