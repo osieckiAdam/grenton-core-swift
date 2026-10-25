@@ -1,9 +1,11 @@
 name: pages
 # Publishes the documentation site (site/ plus the DocC reference) to
-# GitHub Pages after every release: the tag the release workflow pushes.
+# GitHub Pages on every merge into main — every merge is a release. (A tag
+# pushed by the release workflow's token triggers no workflow, so the tag
+# cannot be the trigger.)
 on:
   push:
-    tags: ["[0-9]*"]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
