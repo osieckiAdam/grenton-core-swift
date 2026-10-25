@@ -34,6 +34,7 @@ port, the docs and the examples, and the gates.
 
 - The spec is normative text, not a log (see the skill).
 - No identifiers of the user's real installation in files or commit messages. The gate also knows the project file when `git config grenton.project <path.omp>` is set, and scans ZIP/.omp files entry by entry.
+- `main` takes changes only through a pull request; the `check` workflow (scripts/check.sh on a macOS runner) must pass. Work on a branch (`port-X.Y.Z`), push it, `gh pr create`, `gh pr merge --squash --delete-branch`. **Every merge into main is a release**: `scripts/release.sh X.Y.Z` prepares it on the branch (CHANGELOG heading, `from:` in the docs), and the `release` workflow tags the version from `port.json` on merge — failing when that version is already tagged. A port-only fix after a tag therefore needs a spec bump; the version is the spec's.
 - Commit messages: one imperative sentence naming the change; a port of a spec version starts "Follow spec X.Y.Z: …" and ends with "(suite X.Y.Z)"; then a paragraph on what changed and why.
 - Live runs need Local Network access for the app they run in. On this Mac, Terminal.app has it. VS Code, including its built-in terminal and Claude's session, does not unless it is granted in System Settings → Privacy & Security → Local Network. Writes that change the house need the user's go-ahead.
 - GrentonModel and GrentonRuntime are not docs-gated yet. Much of their public API is plumbing between modules and should become `package` access.

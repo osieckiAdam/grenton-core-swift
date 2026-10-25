@@ -1,0 +1,34 @@
+name: release
+# Every merge into main is a release of the spec version the port
+# implements: the tag is the version in port.json. The pull request
+# prepares it with scripts/release.sh (CHANGELOG heading, `from:` in the
+# documentation); this job checks that and tags, and fails when the
+# version is already tagged — a port-only fix after a tag needs a spec
+# bump, because the port's version is the spec's.
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0, submodules: true }
+      - name: Read the version
+        id: version
+        run: echo "version=$(python3 -c "import json;print(json.load(open('Tests/GrentonConformanceTests/port.json'))['suiteVersion'])")" >> "$GITHUB_OUTPUT"
+      - name: The tree is a release of that version
+        run: scripts/check-release.py "${{ steps.version.outputs.version }}"
+      - name: Tag it, once
+        env: { V: "${{ steps.version.outputs.version }}" }
+        run: |
+          if git rev-parse -q --verify "refs/tags/$V" >/dev/null; then
+            echo "::error::$V is already tagged; a merge into main must carry a new spec version"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$V" -m "Implements spec $V, passes suite $V"
+          git push origin "refs/tags/$V"
