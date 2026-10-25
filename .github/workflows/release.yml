@@ -24,19 +24,27 @@ jobs:
       - name: Read the version
         id: version
         run: echo "version=$(python3 -c "import json;print(json.load(open('Tests/GrentonConformanceTests/port.json'))['suiteVersion'])")" >> "$GITHUB_OUTPUT"
-      - name: The tree is a release of that version
-        run: scripts/check-release.py "${{ steps.version.outputs.version }}"
-      - name: Tag it, once
+      - name: Is this merge a release?
+        id: kind
         env: { V: "${{ steps.version.outputs.version }}" }
         run: |
           if git rev-parse -q --verify "refs/tags/$V" >/dev/null; then
             if [ -z "$(git diff --name-only "$V" HEAD | grep -vE '^(\.github/|site/|docs/|README\.md$|CHANGELOG\.md$|Sources/[^/]+/[^/]+\.docc/)')" ]; then
               echo "only workflows and documentation changed since $V: not a release, nothing to tag"
+              echo "release=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             echo "::error::$V is already tagged; a merge into main must carry a new spec version"
             exit 1
           fi
+          echo "release=true" >> "$GITHUB_OUTPUT"
+      - name: The tree is a release of that version
+        if: steps.kind.outputs.release == 'true'
+        run: scripts/check-release.py "${{ steps.version.outputs.version }}"
+      - name: Tag it
+        if: steps.kind.outputs.release == 'true'
+        env: { V: "${{ steps.version.outputs.version }}" }
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$V" -m "Implements spec $V, passes suite $V"
