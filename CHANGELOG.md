@@ -3,7 +3,7 @@
 Versions follow the specification the port implements; see README,
 "Versioning and stability".
 
-## Unreleased
+## 0.12.2 — 2026-10-26
 
 - Follows spec 0.12.2 (suite 0.12.2, 254 cases): a rule-list row is
   exactly `{int, int, "text"}` — a missing separator, an empty or a
