@@ -3,7 +3,7 @@
 Versions follow the specification the port implements; see README,
 "Versioning and stability".
 
-## Unreleased
+## 0.12.1 — 2026-10-25
 
 - Follows spec 0.12.1 (suite 0.12.1, 249 cases). Two widget types v1 left
   out are devices now: `EVENT_SCHEDULER` → `EventScheduleEntity` (rules as
