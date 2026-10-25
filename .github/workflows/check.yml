@@ -1,0 +1,19 @@
+name: check
+# The gate every pull request passes before it may merge into main: the
+# same scripts/check.sh the pre-push hook runs.
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  check:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: true }
+      - uses: maxim-lobanov/setup-xcode@v1
+        with: { xcode-version: latest-stable }
+      - run: swift --version
+      - name: Declare no installation (CI has no interface archive)
+        run: git config grenton.interface none
+      - run: scripts/check.sh

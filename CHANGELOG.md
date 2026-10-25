@@ -3,7 +3,7 @@
 Versions follow the specification the port implements; see README,
 "Versioning and stability".
 
-## Unreleased
+## 0.11.2 — 2026-10-25
 
 - Requires Swift 6.2.3 (Xcode 26.2) to build; apps still run on iOS 16 /
   macOS 13. The catalogue enums (`BoundEntity`, `EntityDescriptor`,

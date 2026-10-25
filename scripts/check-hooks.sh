@@ -3,6 +3,8 @@
 # is the same script the spec repository runs.
 cd "$(dirname "$0")/.."
 hooks=$(git config --get core.hooksPath)
+# CI has no hooks: it runs the gate itself.
+[ -n "$CI" ] && hooks=scripts/hooks
 if [ "$hooks" != "scripts/hooks" ]; then
     echo "git hooks: not enabled in this clone — run: git config core.hooksPath scripts/hooks" >&2
     exit 1

@@ -18,8 +18,12 @@ guard arguments.count >= 4 else {
     exit(2)
 }
 
+// GRENTON_DEBUG=1 prints every frame sent and received: the way to see
+// what a CLU really answers when a value comes back as "no answer".
+let logger: GrentonLogger = ProcessInfo.processInfo.environment["GRENTON_DEBUG"] == "1"
+    ? .standardOutput : .disabled
 let system = try GrentonSystem(
-    interfaceArchive: Data(contentsOf: URL(fileURLWithPath: arguments[1])))
+    interfaceArchive: Data(contentsOf: URL(fileURLWithPath: arguments[1])), logger: logger)
 let cluId = arguments[2]
 
 // 1. The keys to read: an object name and a feature index each.

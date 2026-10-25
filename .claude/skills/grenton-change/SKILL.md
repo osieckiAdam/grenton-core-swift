@@ -43,8 +43,9 @@ When unsure whether the spec describes it, grep `vendor/grenton-core-spec/spec/g
    keep `README.md`'s "Version X.Y.Z contains … N cases in total" current.
    The evidence (what was observed, why) goes into the CHANGELOG, not the
    spec; a finding that changes a rule also goes into `docs/decisions.md`.
-5. Commit and push. The hooks check versions, the CHANGELOG, the suite and
-   installation data.
+5. Commit on a branch, push it and open a pull request; merge it when the
+   `check` workflow is green. The merge tags the version (every merge into
+   `main` is a release, so the PR must have bumped it).
 
 ## 3. Port follows (in `grenton-core-swift`)
 
@@ -109,4 +110,7 @@ the submodule moved.
   interface archive: `dist/interface.zip`, or `git config grenton.interface`.
   Without an archive they fail. A clone with no installation sets
   `grenton.interface none`.
-- Commit order: spec first, then the port.
+- Commit order: spec first, then the port. Both repositories take changes
+  only through pull requests into `main`; a merge is a release and gets its
+  tag from the workflow. In the port, run `scripts/release.sh X.Y.Z` on the
+  branch before the PR.
