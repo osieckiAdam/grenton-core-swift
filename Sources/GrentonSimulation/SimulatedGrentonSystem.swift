@@ -65,11 +65,13 @@ public final class SimulatedGrentonSystem: Sendable {
     /// Creates the devices of an interface over an empty store: every
     /// value is unknown until ``set(_:to:)``.
     ///
-    /// - Parameter echoesSwitches: When `true`, the on and off commands of
-    ///   switches, dimmers and RGB lights set their state as a CLU would
-    ///   report it (`"ON"`/`"OFF"`, a dimmer's full or zero level, `1`/`0`
-    ///   for an RGB light's power) — a demo mode for previews. Every other
-    ///   command still changes nothing.
+    /// - Parameters:
+    ///   - interface: The mobile interface, downloaded or imported.
+    ///   - echoesSwitches: When `true`, the on and off commands of
+    ///     switches, dimmers and RGB lights set their state as a CLU would
+    ///     report it (`"ON"`/`"OFF"`, a dimmer's full or zero level, `1`/`0`
+    ///     for an RGB light's power) — a demo mode for previews. Every other
+    ///     command still changes nothing.
     public init(interface: MobileInterfaceDTO, echoesSwitches: Bool = false) {
         clus = interface.clus.map(Clu.init(dto:))
         let store = StateStore()
