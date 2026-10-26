@@ -47,6 +47,22 @@ with a section header and a switch:
 A `HEADER` is its `id` and the first component's `label`; the switch
 after it gets `section.title == "Oświetlenie"`.
 
+A hand-written widget with a wrong field is **skipped silently**, as the
+library promises for interfaces from Object Manager (the page survives,
+the widget lands in `skippedWidgets`): an `ON_OFF_DOUBLE` whose components
+say `BUTTON_BISTABLE` instead of `BUTTON_BISTABLE_V2` simply yields no
+lights. Guard every fixture with one assertion:
+
+```swift
+precondition(interface.skippedWidgets.isEmpty, "the fixture is wrong, not the app")
+```
+
+The component type each widget expects is listed in the specification
+(`grenton-core-design.md`, §3.5): `ON_OFF` → `BUTTON_BISTABLE`,
+`ON_OFF_DOUBLE` → `BUTTON_BISTABLE_V2`, `SCENE` → `BUTTON_MONOSTABLE`,
+`CAMERA` → `CAMERA_STREAM`, `LED` → `BUTTON_BISTABLE` plus the three
+`SLIDER_*`, the legacy `ROLLER_SHUTTER` → `BUTTON_BISTABLE`.
+
 ```swift
 import GrentonKit
 import GrentonSimulation
@@ -120,3 +136,15 @@ if let light = demo.entities.compactMap(\.switchable).first {
 
 Link `GrentonSimulation` into the app for that; it is small and has no
 dependency beyond the library.
+
+### In an Xcode project
+
+Xcode's default test target is hosted by the app. When the app links
+`GrentonKit` and the test target links `GrentonSimulation`, Xcode builds
+the second product as a dynamic framework with its own copy of
+`GrentonDevices`, and the test log says every entity class "is
+implemented in both" — casts and observation across the two copies are
+not reliable. Link `GrentonSimulation` in **one** place: in the app
+(it is what a demo mode needs anyway) and let the test target use the
+host's copy; or make the test target unhosted. A `swift test` package has
+no host app and no such issue.

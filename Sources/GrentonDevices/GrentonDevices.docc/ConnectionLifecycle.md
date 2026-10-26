@@ -37,7 +37,7 @@ or ``GrentonSystem/diagnostics()`` then. It is a flag, like an entity's
 
 ```swift
 Task {
-    for await _ in system.sessionStateUpdates() {
+    for await _ in await system.sessionStateUpdates() {
         let states = await system.sessionStates()
         print(states.values.allSatisfy { $0 == .ready } ? "connected" : "a CLU is not answering")
     }

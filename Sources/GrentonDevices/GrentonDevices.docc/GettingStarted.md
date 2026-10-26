@@ -87,8 +87,8 @@ and create the system from it:
 ```swift
 import GrentonKit
 
-let store = try InterfaceStore()
-if let interface = try store.interface() {
+let saved = try InterfaceStore()
+if let interface = try saved.interface() {
     let system = try GrentonSystem(interface: interface)
     print(interface.name, interface.pages.map(\.name))
     _ = system
