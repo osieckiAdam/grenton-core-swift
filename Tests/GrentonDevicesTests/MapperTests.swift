@@ -86,7 +86,7 @@ import GrentonModel
         ] }
         """
         let widget = try JSONDecoder().decode(WidgetDTO.self, from: Data(json.utf8))
-        let device = DeviceMapper.descriptor(for: widget, page: DevicePage(index: 0, name: "p"))
+        let device = DeviceMapper.descriptor(for: widget, page: DevicePage(index: 0, name: "p", icon: "star"))
         #expect(device.entities.isEmpty)
     }
 
@@ -100,7 +100,7 @@ import GrentonModel
         ] }
         """
         let widget = try JSONDecoder().decode(WidgetDTO.self, from: Data(json.utf8))
-        #expect(DeviceMapper.descriptor(for: widget, page: DevicePage(index: 0, name: "p")).entities.isEmpty)
+        #expect(DeviceMapper.descriptor(for: widget, page: DevicePage(index: 0, name: "p", icon: "star")).entities.isEmpty)
     }
 
     @Test func coverMapsTiltAndStop() throws {

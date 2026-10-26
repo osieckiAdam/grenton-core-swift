@@ -121,6 +121,8 @@ public enum BoundEntity: Sendable {
     public var id: String { underlying.id }
     /// The label from the mobile interface.
     public var name: String { underlying.name }
+    /// The icon name chosen in Object Manager, or `nil`; the only hint of what a device is, since the protocol has no device class.
+    public var icon: String? { underlying.icon }
 
     /// A stream that fires whenever this entity's state changes.
     ///
