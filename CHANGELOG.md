@@ -3,7 +3,7 @@
 Versions follow the specification the port implements; see README,
 "Versioning and stability".
 
-## Unreleased
+## 0.14.0 — 2026-10-26
 
 - Follows spec 0.14.0 (suite 0.14.0): icons travel with the devices.
   `BoundEntity.icon` / `GrentonEntity.icon`, `DeviceDescriptor.icon` and
