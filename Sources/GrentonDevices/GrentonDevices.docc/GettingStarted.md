@@ -15,7 +15,7 @@ In `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/osieckiAdam/grenton-core-swift.git", from: "0.12.2"),
+    .package(url: "https://github.com/osieckiAdam/grenton-core-swift.git", from: "0.13.1"),
 ],
 targets: [
     .executableTarget(
@@ -80,7 +80,23 @@ await system.start()
 ```
 
 `GrentonSystem(interfaceArchive:)` does the same from archive bytes you
-keep elsewhere.
+keep elsewhere. When your app also needs the interface itself — the
+pages' icons, the list of CLUs, the raw widgets — take it from the store
+and create the system from it:
+
+```swift
+import GrentonKit
+
+let saved = try InterfaceStore()
+if let interface = try saved.interface() {
+    let system = try GrentonSystem(interface: interface)
+    print(interface.name, interface.pages.map(\.name))
+    _ = system
+}
+```
+
+A project file works the same way: `store.save(project:interfaceId:)`
+keeps it, and `interface()` and `system()` read it.
 
 ``GrentonSystem/init(interface:socketFactory:logger:pingInterval:registerInterval:responseTimeout:)``
 takes an already parsed interface instead, for example one imported from a

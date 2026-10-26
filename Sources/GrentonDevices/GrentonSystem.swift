@@ -68,6 +68,8 @@ public actor GrentonSystem: CommandExecuting {
 
     private var sessions: [String: CluSession] = [:]
     private var reportTasks: [Task<Void, Never>] = []
+    private var stateTasks: [Task<Void, Never>] = []
+    private var stateWatchers: [UUID: AsyncStream<Void>.Continuation] = [:]
     private var started = false
 
     // start/stop serialization: actors are reentrant across await, and an
@@ -196,17 +198,46 @@ public actor GrentonSystem: CommandExecuting {
             }
         }
 
-        for (cluId, session) in sessions {
+        for session in sessions.values {
             let stream = await session.reports()
             reportTasks.append(Task { [store] in
                 for await report in stream {
                     store.updateKeys(report.keys, report.slots)
                 }
             })
-            _ = cluId
+            if stateTasks.count < sessions.count {
+                // Sessions outlive stop(): one forwarder per session, for good.
+                let states = await session.stateUpdates()
+                stateTasks.append(Task { [weak self] in
+                    for await _ in states { await self?.signalStateChange() }
+                })
+            }
         }
+        signalStateChange()   // the start itself is a change
 
         await registerAll()
+    }
+
+    private func signalStateChange() {
+        for sink in stateWatchers.values { sink.yield(()) }
+    }
+
+    /// A flag stream: one `()` whenever any CLU's connection state changes,
+    /// including ``start()`` and ``stop()``; read ``sessionStates()`` or
+    /// ``diagnostics()`` for the values. Changes coalesce while you are
+    /// busy, none is lost. A new stream per call.
+    public func sessionStateUpdates() -> AsyncStream<Void> {
+        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            let id = UUID()
+            stateWatchers[id] = continuation
+            continuation.onTermination = { [weak self] _ in
+                Task { await self?.removeStateWatcher(id) }
+            }
+        }
+    }
+
+    private func removeStateWatcher(_ id: UUID) {
+        stateWatchers[id] = nil
     }
 
     // Serialized against start(); cancelled report tasks are AWAITED so none
@@ -232,6 +263,7 @@ public actor GrentonSystem: CommandExecuting {
                 group.addTask { await session.stop() }
             }
         }
+        signalStateChange()
     }
 
     // spec §5.4.4 Δ: a changed subscription set must not wait for the loop tick.

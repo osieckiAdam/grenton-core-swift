@@ -37,6 +37,12 @@ struct RoomView: View {
 }
 ```
 
+A view that only needs "something that turns on and off" observes the
+existential: `Observed(entity.switchable!)` is an
+`Observed<any SwitchableEntity>`, and `Observed(stateful)` with an
+`any StatefulEntity` works the same way. For a stream of your own, use
+`Observed(entity, updates:)`.
+
 Requires iOS 17 / macOS 14 (the Observation framework); the rest of the
 library runs on iOS 16 / macOS 13, which is why this is a separate
 module. Entities without state — buttons, scenes, cameras, remotes —

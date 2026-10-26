@@ -10,15 +10,18 @@ final class CommandRecorder: CommandExecuting, @unchecked Sendable {
     private let lock = NSLock()
     private var actions: [ActionRef] = []
     private var failure: (any Error)?
+    /// Set by the simulation when it echoes switch commands (§6.3.1–§6.3.3).
+    var echo: (@Sendable (ActionRef) -> Void)?
 
     func execute(_ action: ActionRef) async throws {
         // Recorded before the caller resumes, so a test that awaited the
         // command sees it in `executedActions` without waiting.
-        let failure: (any Error)? = lock.withLock {
+        let (failure, echo): ((any Error)?, (@Sendable (ActionRef) -> Void)?) = lock.withLock {
             actions.append(action)
-            return self.failure
+            return (self.failure, self.echo)
         }
         if let failure { throw failure }
+        echo?(action)
     }
 
     var executed: [ActionRef] { lock.withLock { actions } }
@@ -44,8 +47,10 @@ final class CommandRecorder: CommandExecuting, @unchecked Sendable {
 /// ```
 ///
 /// A command does not change any value — on a real CLU the new value
-/// arrives as a report, later. Set it yourself when the test needs it.
-/// Entities signal `updates()` for values set here exactly as for reports.
+/// arrives as a report, later. Set it yourself when the test needs it, or
+/// create the simulation with `echoesSwitches: true` for a demo mode in
+/// which a light turns on and off as commanded. Entities signal
+/// `updates()` for values set here exactly as for reports.
 public final class SimulatedGrentonSystem: Sendable {
     /// The devices as plain descriptions, without state or commands.
     public let descriptors: [DeviceDescriptor]
@@ -59,7 +64,15 @@ public final class SimulatedGrentonSystem: Sendable {
 
     /// Creates the devices of an interface over an empty store: every
     /// value is unknown until ``set(_:to:)``.
-    public init(interface: MobileInterfaceDTO) {
+    ///
+    /// - Parameters:
+    ///   - interface: The mobile interface, downloaded or imported.
+    ///   - echoesSwitches: When `true`, the on and off commands of
+    ///     switches, dimmers and RGB lights set their state as a CLU would
+    ///     report it (`"ON"`/`"OFF"`, a dimmer's full or zero level, `1`/`0`
+    ///     for an RGB light's power) — a demo mode for previews. Every other
+    ///     command still changes nothing.
+    public init(interface: MobileInterfaceDTO, echoesSwitches: Bool = false) {
         clus = interface.clus.map(Clu.init(dto:))
         let store = StateStore()
         let recorder = CommandRecorder()
@@ -67,6 +80,29 @@ public final class SimulatedGrentonSystem: Sendable {
         self.recorder = recorder
         descriptors = DeviceMapper.descriptors(for: interface)
         devices = DeviceBinder.bind(descriptors, context: DeviceContext(store: store, executor: recorder))
+        if echoesSwitches {
+            // On/off actions of every switchable entity, by identity.
+            var onOff: [ActionRef: (ValueRef, GrentonValue)] = [:]
+            for entity in devices.flatMap(\.entities) {
+                switch entity {
+                case .toggle(let e):
+                    onOff[e.descriptor.onAction] = (e.descriptor.state, .string("ON"))
+                    onOff[e.descriptor.offAction] = (e.descriptor.state, .string("OFF"))
+                case .dimmableLight(let e):
+                    // The state is the level: full on, fully off.
+                    onOff[e.descriptor.onAction] = (e.descriptor.state, .double(e.descriptor.max))
+                    onOff[e.descriptor.offAction] = (e.descriptor.state, .double(e.descriptor.min))
+                case .hsbLight(let e):
+                    onOff[e.descriptor.onAction] = (e.descriptor.powerState, .int(1))
+                    onOff[e.descriptor.offAction] = (e.descriptor.powerState, .int(0))
+                default: break
+                }
+            }
+            let table = onOff
+            recorder.echo = { action in
+                if let (ref, value) = table[action] { store.updateKeys([ref], [.value(value)], includingUnknown: true) }
+            }
+        }
     }
 
     /// Every entity of every device, in device order.

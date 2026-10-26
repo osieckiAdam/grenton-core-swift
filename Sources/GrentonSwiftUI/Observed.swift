@@ -23,25 +23,41 @@ import GrentonDevices
 /// }
 /// ```
 ///
+/// `Entity` is a concrete entity type, or `any SwitchableEntity` / `any StatefulEntity` when the view does not care which: `Observed(entity.switchable!)` gives an `Observed<any SwitchableEntity>`.
+///
 /// Create one per entity, where the entity lives (a view model, `@State`), not in `body`. Reading ``value`` inside `body` is what subscribes the view; the wrapper stops listening when it is deallocated.
 @available(iOS 17, macOS 14, *)
 @Observable
 @MainActor
-public final class Observed<Entity: StatefulEntity> {
+public final class Observed<Entity: Sendable> {
     private let entity: Entity
     private var revision = 0
     @ObservationIgnored private var listener: Task<Void, Never>?
 
-    /// Starts observing `entity`.
-    public init(_ entity: Entity) {
+    /// Observes `entity` through `updates`, its change stream.
+    public init(_ entity: Entity, updates: AsyncStream<Void>) {
         self.entity = entity
-        let updates = entity.updates()
         listener = Task { [weak self] in
             for await _ in updates {
                 guard let self else { return }
                 self.revision &+= 1
             }
         }
+    }
+
+    /// Starts observing a concrete entity.
+    public convenience init(_ entity: Entity) where Entity: StatefulEntity {
+        self.init(entity, updates: entity.updates())
+    }
+
+    /// Starts observing a switch, dimmer or RGB light of any kind.
+    public convenience init(_ entity: Entity) where Entity == any SwitchableEntity {
+        self.init(entity, updates: entity.updates())
+    }
+
+    /// Starts observing an entity of any kind with state.
+    public convenience init(_ entity: Entity) where Entity == any StatefulEntity {
+        self.init(entity, updates: entity.updates())
     }
 
     deinit {
