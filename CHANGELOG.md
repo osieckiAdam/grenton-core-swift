@@ -3,6 +3,15 @@
 Versions follow the specification the port implements; see README,
 "Versioning and stability".
 
+## 0.14.0 — 2026-10-26
+
+- Follows spec 0.14.0 (suite 0.14.0): icons travel with the devices.
+  `BoundEntity.icon` / `GrentonEntity.icon`, `DeviceDescriptor.icon` and
+  `DevicePage.icon` carry the icon names chosen in Object Manager — the
+  only hint of what a relay drives, since the protocol has no device
+  class; the `ON_OFF` component DTOs gain `image`. Concepts and
+  Controlling Devices ("Lights only") show how an app uses them.
+
 ## 0.13.1 — 2026-10-26
 
 - Follows spec 0.13.1 (suite 0.13.1): every `DeviceDescriptor` carries

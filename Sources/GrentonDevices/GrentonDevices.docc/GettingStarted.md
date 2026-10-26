@@ -15,7 +15,7 @@ In `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/osieckiAdam/grenton-core-swift.git", from: "0.13.1"),
+    .package(url: "https://github.com/osieckiAdam/grenton-core-swift.git", from: "0.14.0"),
 ],
 targets: [
     .executableTarget(

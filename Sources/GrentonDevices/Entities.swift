@@ -39,6 +39,8 @@ public protocol GrentonEntity: Sendable {
     var id: String { get }
     /// The label from the mobile interface.
     var name: String { get }
+    /// The icon name chosen in Object Manager — the only hint of what a device is, since the protocol has no device class; `nil` when the interface gives none.
+    var icon: String? { get }
 }
 
 /// A device of a running system: one widget of the interface and its live
@@ -119,6 +121,8 @@ public enum BoundEntity: Sendable {
     public var id: String { underlying.id }
     /// The label from the mobile interface.
     public var name: String { underlying.name }
+    /// The icon name chosen in Object Manager, or `nil`; the only hint of what a device is, since the protocol has no device class.
+    public var icon: String? { underlying.icon }
 
     /// A stream that fires whenever this entity's state changes.
     ///
@@ -772,58 +776,72 @@ public final class ThermostatEntity: Sendable {
 extension ToggleEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 extension DimmableLightEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 extension HsbLightEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 extension ContactSensorEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 extension SensorEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 extension NumberSettingEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 extension CoverEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 extension StateSensorEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 extension TriggerEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 extension SceneTriggerEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 extension CameraEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 extension ThermostatEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 extension EventScheduleEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 extension TvRemoteEntity: GrentonEntity {
     public var id: String { descriptor.id }
     public var name: String { descriptor.name }
+    public var icon: String? { descriptor.icon }
 }
 
 /// An event scheduler: up to 16 rules, each a time of day on chosen weekdays, that fire an action on the CLU.

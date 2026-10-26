@@ -29,6 +29,25 @@ if case .dimmableLight(let dimmer) = entity {
 }
 ```
 
+### Lights only
+
+Switches, dimmers and RGB lights share ``SwitchableEntity``; the icon
+tells which of the switches are lights. The names come from Object
+Manager's icon set — the ones for lamps contain `lamp`, `bulb` or
+`plafond` — so a filter is yours to define and easy to adjust:
+
+```swift
+func isLight(_ entity: BoundEntity) -> Bool {
+    guard entity.switchable != nil, let icon = entity.icon else { return false }
+    return ["lamp", "bulb", "plafond", "light"].contains { icon.contains($0) }
+}
+let lights = system.entities.filter(isLight)
+```
+
+A dimmer or an RGB light is a light whatever its icon says; the check
+above keeps them only when the installer chose a lamp icon, so widen it
+to `entity.switchable != nil && !(entity is a toggle)` if you prefer.
+
 ### Thermostats
 
 ```swift
