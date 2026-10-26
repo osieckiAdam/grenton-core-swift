@@ -3,7 +3,7 @@
 Versions follow the specification the port implements; see README,
 "Versioning and stability".
 
-## Unreleased
+## 0.13.1 — 2026-10-26
 
 - Follows spec 0.13.1 (suite 0.13.1): every `DeviceDescriptor` carries
   `section` — the header above it on its page, as the myGrenton app
