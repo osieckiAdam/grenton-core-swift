@@ -5,6 +5,19 @@ Versions follow the specification the port implements; see README,
 
 ## Unreleased
 
+- Follows spec 0.13.1 (suite 0.13.1): every `DeviceDescriptor` carries
+  `section` — the header above it on its page, as the myGrenton app
+  groups devices (`DeviceSection`, `id` and `title`).
+- From the first app built on the library (a macOS menu-bar app):
+  `SwitchableEntity` is a `StatefulEntity`, and `Observed` takes
+  `any SwitchableEntity` / `any StatefulEntity` or an entity with a stream
+  of your own; `GrentonSystem.sessionStateUpdates()` fires on every
+  connection-state change; `InterfaceStore` keeps a project file too
+  (`save(project:interfaceId:)`, `loadProject()`), and `system()` builds
+  from whichever is saved; `SimulatedGrentonSystem(interface:echoesSwitches:)`
+  makes lights follow their commands for previews and demo mode. Articles:
+  macOS sleep and menu-bar apps, following the connection, the interface
+  beside the system, the smallest `data.json`.
 - `grenton-cli` and `make-watch-app.sh` are gone: the examples in
   `Examples/` cover everything they did, one readable program each.
 - Documentation: the landing page and Getting Started keep the archive

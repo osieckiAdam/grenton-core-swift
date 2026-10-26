@@ -9,18 +9,31 @@ public enum DeviceMapper {
 
     /// Every device of the interface, one per widget, in page order. Widgets of an unknown type are left out.
     public static func descriptors(for interface: MobileInterfaceDTO) -> [DeviceDescriptor] {
-        interface.pages.enumerated().flatMap { index, page in
-            page.widgets.map { descriptor(for: $0, page: DevicePage(index: index, name: page.name)) }
+        interface.pages.enumerated().flatMap { index, page -> [DeviceDescriptor] in
+            let devicePage = DevicePage(index: index, name: page.name)
+            // The nearest header above, per page (spec §6.1); a header that
+            // did not parse is not in `items`, so it starts no section.
+            var section: DeviceSection?
+            return page.items.compactMap { item in
+                switch item {
+                case .header(let header):
+                    section = DeviceSection(id: header.id, title: header.label)
+                    return nil
+                case .widget(let widget):
+                    return descriptor(for: widget, page: devicePage, section: section)
+                }
+            }
         }
     }
 
-    /// The device for one widget on a page.
-    public static func descriptor(for widget: WidgetDTO, page: DevicePage) -> DeviceDescriptor {
+    /// The device for one widget on a page, under `section` when the page has a header above it.
+    public static func descriptor(for widget: WidgetDTO, page: DevicePage, section: DeviceSection? = nil) -> DeviceDescriptor {
         DeviceDescriptor(
             id: widget.id,
             typeName: widget.typeName,
             kind: kind(of: widget),
             page: page,
+            section: section,
             name: name(of: widget),
             entities: entities(for: widget))
     }

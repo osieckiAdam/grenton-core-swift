@@ -64,3 +64,17 @@ import GrentonSwiftUI
         #expect(weakObserved == nil)
     }
 }
+
+@Suite struct ObservedExistentialTests {
+    @Test @MainActor func observesAnySwitchable() async throws {
+        let url = try #require(Bundle.module.url(forResource: "data", withExtension: "json", subdirectory: "Fixtures"))
+        let simulation = SimulatedGrentonSystem(interface: try MobileInterfaceDTO.decode(from: Data(contentsOf: url)), echoesSwitches: true)
+        let light = try #require(simulation.entities.compactMap(\.switchable).first)
+        let observed = Observed(light)                       // Observed<any SwitchableEntity>
+        #expect(observed.value.isOn == nil)
+        try await observed.value.turnOn()
+        for _ in 0..<100 where observed.changeCount == 0 { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(observed.changeCount == 1)
+        #expect(observed.value.isOn == true)
+    }
+}

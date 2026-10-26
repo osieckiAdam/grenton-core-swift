@@ -28,6 +28,22 @@ for (cluId, state) in states where state != .ready {
 
 Calling `start()` twice does nothing the second time.
 
+### Following the connection
+
+``GrentonSystem/sessionStateUpdates()`` fires whenever any CLU's state
+changes, and on `start()` and `stop()`; read ``GrentonSystem/sessionStates()``
+or ``GrentonSystem/diagnostics()`` then. It is a flag, like an entity's
+`updates()`: changes coalesce while you are busy, none is lost.
+
+```swift
+Task {
+    for await _ in system.sessionStateUpdates() {
+        let states = await system.sessionStates()
+        print(states.values.allSatisfy { $0 == .ready } ? "connected" : "a CLU is not answering")
+    }
+}
+```
+
 ### Telling the user how the house answers
 
 ``GrentonSystem/diagnostics()`` describes each CLU connection: its

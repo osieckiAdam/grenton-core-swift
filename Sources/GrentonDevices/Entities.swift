@@ -159,7 +159,7 @@ public enum BoundEntity: Sendable {
 /// A switch, dimmer or RGB light: anything that turns on and off.
 ///
 /// Get one from ``BoundEntity/switchable``.
-public protocol SwitchableEntity: GrentonEntity {
+public protocol SwitchableEntity: StatefulEntity {
     /// Whether it is on; `nil` until the CLU has reported it.
     var isOn: Bool? { get }
     /// Turns it on.

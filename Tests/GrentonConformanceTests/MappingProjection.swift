@@ -24,6 +24,7 @@ enum MappingProjection {
             "kind": .string(d.kind.rawValue),
             "name": .string(d.name),
             "page": page(d.page),
+            "section": d.section.map { .object(["id": .string($0.id), "title": .string($0.title)]) } ?? .null,
             "entities": .array(d.entities.map(entity)),
         ])
     }

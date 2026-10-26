@@ -10,7 +10,11 @@ import GrentonRuntime
 // plain Documents file. This type is that one correct place, plus the
 // "is the download newer" check Object Manager's `version` allows.
 
-/// Keeps the interface archive between runs, where it belongs: a protected file.
+/// Keeps the interface between runs, where it belongs: a protected file.
+///
+/// It holds either the archive Object Manager sends to a phone, or the
+/// project file (`.omp`) with the id of the interface chosen in it; both
+/// contain the installation's key.
 ///
 /// Download once, save, and start every later run from the saved copy:
 ///
@@ -29,8 +33,19 @@ import GrentonRuntime
 ///
 /// The archive contains the CLUs' encryption key. On iOS the file gets complete protection; on macOS it lives in the app's Application Support directory. Never copy it into `UserDefaults`.
 public struct InterfaceStore: Sendable {
-    /// Where the archive is kept.
+    /// Where the archive is kept; a project file is kept beside it as `project.omp`, with `project.id` naming the chosen interface.
     public let url: URL
+
+    private var projectURL: URL { url.deletingLastPathComponent().appendingPathComponent("project.omp") }
+    private var projectIdURL: URL { url.deletingLastPathComponent().appendingPathComponent("project.id") }
+
+    private var writingOptions: Data.WritingOptions {
+        var options: Data.WritingOptions = [.atomic]
+        #if os(iOS)
+        options.insert(.completeFileProtection)
+        #endif
+        return options
+    }
 
     /// A store at `url`; the directory is created when missing.
     public init(url: URL) throws {
@@ -54,22 +69,48 @@ public struct InterfaceStore: Sendable {
     /// - Throws: `ProvisioningError.invalidData` for an archive that is not an interface, or a file error.
     public func save(_ archive: Data) throws {
         _ = try ProvisioningClient.parseInterfaceArchive(archive)
-        var options: Data.WritingOptions = [.atomic]
-        #if os(iOS)
-        options.insert(.completeFileProtection)
-        #endif
-        try archive.write(to: url, options: options)
+        try archive.write(to: url, options: writingOptions)
+        try removeProject()
     }
 
-    /// The saved archive, or `nil` when nothing was saved yet.
+    /// Saves a project file (`.omp`) and the id of the interface to use from it — `nil` when the project has exactly one. It is parsed first; a project without that interface, or with several and no id, is not saved.
+    /// - Throws: `ProvisioningError.invalidData`, `.interfaceNotFound`, `.interfaceAmbiguous`, or a file error.
+    public func save(project: Data, interfaceId: String? = nil) throws {
+        _ = try ProjectFile(data: project).interface(id: interfaceId)
+        try project.write(to: projectURL, options: writingOptions)
+        if let interfaceId {
+            try Data(interfaceId.utf8).write(to: projectIdURL, options: writingOptions)
+        } else if FileManager.default.fileExists(atPath: projectIdURL.path) {
+            try FileManager.default.removeItem(at: projectIdURL)
+        }
+        if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+    }
+
+    /// The saved archive, or `nil` when nothing was saved or a project file is saved instead.
     public func load() throws -> Data? {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         return try Data(contentsOf: url)
     }
 
-    /// The saved interface, parsed; `nil` when nothing was saved yet.
+    /// The saved project file, or `nil` when nothing was saved or an archive is saved instead.
+    public func loadProject() throws -> Data? {
+        guard FileManager.default.fileExists(atPath: projectURL.path) else { return nil }
+        return try Data(contentsOf: projectURL)
+    }
+
+    /// The saved interface, parsed, from the archive or the project file; `nil` when nothing was saved yet.
     public func interface() throws -> MobileInterfaceDTO? {
-        try load().map { try ProvisioningClient.parseInterfaceArchive($0) }
+        if let archive = try load() { return try ProvisioningClient.parseInterfaceArchive(archive) }
+        guard let project = try loadProject() else { return nil }
+        let id = FileManager.default.fileExists(atPath: projectIdURL.path)
+            ? String(decoding: try Data(contentsOf: projectIdURL), as: UTF8.self) : nil
+        return try ProjectFile(data: project).interface(id: id)
+    }
+
+    private func removeProject() throws {
+        for file in [projectURL, projectIdURL] where FileManager.default.fileExists(atPath: file.path) {
+            try FileManager.default.removeItem(at: file)
+        }
     }
 
     /// Whether `archive` is a newer export of the saved interface than the saved one: the same `id` with a higher `version`, or anything when nothing is saved. A different installation (another `id`) is also "newer".
@@ -79,19 +120,20 @@ public struct InterfaceStore: Sendable {
         return candidate.id != saved.id || candidate.version > saved.version
     }
 
-    /// Removes the saved archive, if any.
+    /// Removes whatever is saved: the archive or the project file.
     public func remove() throws {
         if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+        try removeProject()
     }
 
-    /// A system from the saved archive. Nothing connects until `start()`.
-    /// - Throws: `InterfaceStoreError.nothingSaved` when nothing was saved yet, or what `GrentonSystem(interfaceArchive:)` throws.
+    /// A system from the saved interface. Nothing connects until `start()`.
+    /// - Throws: `InterfaceStoreError.nothingSaved` when nothing was saved yet, or what `GrentonSystem(interface:)` throws.
     public func system(
         socketFactory: any UdpSocketFactory = NetworkUdpSocketFactory(),
         logger: GrentonLogger = .disabled
     ) throws -> GrentonSystem {
-        guard let archive = try load() else { throw InterfaceStoreError.nothingSaved }
-        return try GrentonSystem(interfaceArchive: archive, socketFactory: socketFactory, logger: logger)
+        guard let interface = try interface() else { throw InterfaceStoreError.nothingSaved }
+        return try GrentonSystem(interface: interface, socketFactory: socketFactory, logger: logger)
     }
 }
 

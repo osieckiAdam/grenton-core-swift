@@ -29,6 +29,22 @@ sensor with a button is one device with a sensor and a trigger.
 Entity ids are stable: the widget id plus a suffix, such as `k3Xq9TzA_0`.
 Use them to store your own settings per entity.
 
+Every device knows where the myGrenton app shows it: its `page` (index
+and name, often a room) and its `section` — the header above it on that
+page, or `nil` above the first header. Devices come in page order, so a
+list grouped by `page` and then `section` reproduces the app's layout:
+
+```swift
+let grouped = Dictionary(grouping: system.devices) { $0.descriptor.page.index }
+for (index, devices) in grouped.sorted(by: { $0.key < $1.key }) {
+    print(devices[0].descriptor.page.name)
+    for device in devices {
+        print("  \(device.descriptor.section?.title ?? "—"): \(device.descriptor.name)")
+    }
+    _ = index
+}
+```
+
 ### Normalized state
 
 Entities hide how a device encodes its state: a switch is on or off, a

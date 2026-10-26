@@ -66,12 +66,29 @@ A command sent while the system is stopped throws
 `SessionError.notConnected`. See <doc:ConnectionLifecycle> for what
 happens to commands and subscriptions around `stop()`.
 
+### macOS: sleep, wake and menu-bar apps
+
+A Mac app keeps running, so start the system once and leave it running:
+the CLUs push every change to it, and a started system costs one ping
+per CLU every five seconds plus the renewal every thirty. Do not stop
+and start it around every opening of a menu or window — `start()` opens
+the sockets, pings every CLU and subscribes to every value again, which
+takes a second or two for a few hundred values, and the values are `nil`
+until the first report arrives. After the Mac sleeps, nothing needs
+doing: the subscriptions expired on the CLUs meanwhile, the first ping
+after waking finds the socket dead or the CLU silent, the session goes
+`degraded`, and the next answered ping subscribes again (within about
+ten seconds). Watch ``GrentonSystem/sessionStateUpdates()`` to show it.
+Stop the system when the app quits, so the CLUs stop pushing to a closed
+port at once instead of a minute later.
+
 ### Keeping the interface
 
 The interface archive and the `.omp` project file both contain the AES key
 of the installation. Keep them where only the app can read them. The
-`GrentonKit` module's `InterfaceStore` is that place: the app's own folder
-under Application Support, written atomically and, on iOS, with
+`GrentonKit` module's `InterfaceStore` is that place for both — `save(_:)`
+for the archive, `save(project:interfaceId:)` for a project file: the app's
+own folder under Application Support, written atomically and, on iOS, with
 `.completeFileProtection`, so the file stays encrypted while the device is
 locked; it also tells a newer export apart by its `version`. Never put the
 archive in a shared location, in `UserDefaults` or in logs. The library

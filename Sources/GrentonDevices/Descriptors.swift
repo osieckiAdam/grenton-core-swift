@@ -21,12 +21,28 @@ public struct DeviceDescriptor: Identifiable, Sendable {
     // The interface page the widget sits on (spec §6.1).
     /// The interface page the widget is on.
     public let page: DevicePage
+    /// The section header above the widget on its page, as the app groups it; `nil` above the first header or on a page without one.
+    public let section: DeviceSection?
     // The widget label, or the non-empty labels of its components joined
     // with " / " for widgets without one (spec §6.1).
     /// The widget's label, or its components' labels joined with " / " when the widget has none (such as a double switch).
     public let name: String
     /// The things you read and control on this device.
     public let entities: [EntityDescriptor]
+}
+
+/// The section header a device is shown under in the myGrenton app (spec §6.1).
+public struct DeviceSection: Hashable, Sendable {
+    /// The header widget's id.
+    public let id: String
+    /// The header's text.
+    public let title: String
+
+    /// Creates a section reference.
+    public init(id: String, title: String) {
+        self.id = id
+        self.title = title
+    }
 }
 
 // A page of the mobile interface: its position and its name.

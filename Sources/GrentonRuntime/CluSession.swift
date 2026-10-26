@@ -98,7 +98,27 @@ public actor CluSession {
     /// (spec §5.3.1).
     private let keepAliveId: String
 
-    public private(set) var state: SessionState = .idle
+    public private(set) var state: SessionState = .idle {
+        didSet { if state != oldValue { for sink in stateSubscribers.values { sink.yield(()) } } }
+    }
+    private var stateSubscribers: [UUID: AsyncStream<Void>.Continuation] = [:]
+
+    /// A flag stream: one `()` after every change of ``state``, coalesced
+    /// while the consumer is busy; read ``state`` (or ``diagnostics``) for
+    /// the value. A new stream per call; it stays open across stop/start.
+    public func stateUpdates() -> AsyncStream<Void> {
+        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            let id = UUID()
+            stateSubscribers[id] = continuation
+            continuation.onTermination = { [weak self] _ in
+                Task { await self?.removeStateSubscriber(id) }
+            }
+        }
+    }
+
+    private func removeStateSubscriber(_ id: UUID) {
+        stateSubscribers[id] = nil
+    }
 
     /// Pings on the wire that timed out since the main socket opened or
     /// the last reply; the third one retires the socket (spec §5.4.5).
