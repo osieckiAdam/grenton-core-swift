@@ -18,6 +18,8 @@ public struct DeviceDescriptor: Identifiable, Sendable {
     // Canonical device kind, fixed per widget type (spec §6.1).
     /// What the device is, such as a switch, a thermostat or a shutter.
     public let kind: DeviceKind
+    /// The icon name chosen in Object Manager for the widget; `nil` for the widget types that carry icons on their components instead (switches, scenes, cameras).
+    public let icon: String?
     // The interface page the widget sits on (spec §6.1).
     /// The interface page the widget is on.
     public let page: DevicePage
@@ -52,11 +54,14 @@ public struct DevicePage: Hashable, Sendable {
     public let index: Int
     /// The page's title, often a room.
     public let name: String
+    /// The icon name chosen for the page in Object Manager.
+    public let icon: String
 
     /// Creates a page reference.
-    public init(index: Int, name: String) {
+    public init(index: Int, name: String, icon: String) {
         self.index = index
         self.name = name
+        self.icon = icon
     }
 }
 
@@ -152,6 +157,26 @@ public enum EntityDescriptor: Identifiable, Sendable {
         }
     }
 
+    /// The icon name chosen in Object Manager, or `nil`.
+    public var icon: String? {
+        switch self {
+        case .toggle(let d): return d.icon
+        case .dimmableLight(let d): return d.icon
+        case .hsbLight(let d): return d.icon
+        case .contactSensor(let d): return d.icon
+        case .sensor(let d): return d.icon
+        case .numberSetting(let d): return d.icon
+        case .cover(let d): return d.icon
+        case .stateSensor(let d): return d.icon
+        case .trigger(let d): return d.icon
+        case .sceneTrigger(let d): return d.icon
+        case .camera(let d): return d.icon
+        case .thermostat(let d): return d.icon
+        case .eventSchedule(let d): return d.icon
+        case .tvRemote(let d): return d.icon
+        }
+    }
+
     // The CLU object this entity operates (spec §6.6): its primary state
     // ref, or its action when it has no state. `nil` for a camera, which
     // involves no CLU object.
@@ -210,6 +235,8 @@ public struct EventScheduleDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// The State feature: 1 while the scheduler fires its rules.
     public let state: ValueRef
     /// The RuleList feature: every rule as the CLU serializes them.
@@ -250,6 +277,8 @@ public struct TvRemoteDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// The label of the VOD button.
     public let vodLabel: String
     /// The buttons the remote has, with their actions; empty before any button is assigned in Object Manager.
@@ -265,6 +294,8 @@ public struct ToggleDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// The CLU value the entity reads.
     public let state: ValueRef
     /// The action that turns it on.
@@ -284,6 +315,8 @@ public struct DimmableLightDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// The CLU value the entity reads.
     public let state: ValueRef
     /// The lowest device value.
@@ -342,6 +375,8 @@ public struct HsbLightDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// The CLU value that says whether the light is on.
     public let powerState: ValueRef
     /// The action that turns it on.
@@ -363,6 +398,8 @@ public struct ContactSensorDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// The CLU value the entity reads.
     public let state: ValueRef
     /// Whether the sensor's reading is inverted (the widget's “reverse state”).
@@ -408,6 +445,8 @@ public struct SensorDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// The CLU value the entity reads.
     public let state: ValueRef
     /// What the sensor measures.
@@ -428,6 +467,8 @@ public struct NumberSettingDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// The CLU value the entity reads.
     public let state: ValueRef
     /// The action that sets a new value; its value is replaced when sent.
@@ -455,6 +496,8 @@ public struct CoverDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// Raw motion enum: 0 idle, 1 opening, 2 closing.
     public let motionState: ValueRef
     /// Raw position 0...100 (0 = closed).
@@ -475,6 +518,8 @@ public struct StateSensorDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// The CLU value the entity reads.
     public let state: ValueRef
 }
@@ -486,6 +531,8 @@ public struct TriggerDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// The action it runs.
     public let action: ActionRef
 }
@@ -497,6 +544,8 @@ public struct SceneTriggerDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// The action it runs.
     public let action: ActionRef
 }
@@ -508,6 +557,8 @@ public struct CameraDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// The stream address, such as an RTSP URL.
     public let streamURL: String
 }
@@ -527,6 +578,8 @@ public struct ThermostatDescriptor: Sendable {
     public let id: String
     /// The label from the mobile interface.
     public let name: String
+    /// The icon name chosen in Object Manager: the component's, or the widget's; `nil` when the interface gives none.
+    public let icon: String?
     /// The CLU value with the measured temperature.
     public let currentTemperature: ValueRef
     /// Effective target (TargetTemp) — follows the mode (manual/holiday/schedule).

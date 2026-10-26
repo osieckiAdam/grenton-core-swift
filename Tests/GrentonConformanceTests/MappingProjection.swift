@@ -23,6 +23,7 @@ enum MappingProjection {
             "widgetType": .string(d.typeName),
             "kind": .string(d.kind.rawValue),
             "name": .string(d.name),
+            "icon": d.icon.map(JSON.string) ?? .null,
             "page": page(d.page),
             "section": d.section.map { .object(["id": .string($0.id), "title": .string($0.title)]) } ?? .null,
             "entities": .array(d.entities.map(entity)),
@@ -30,7 +31,7 @@ enum MappingProjection {
     }
 
     static func page(_ p: DevicePage) -> JSON {
-        .object(["index": .number(Double(p.index)), "name": .string(p.name)])
+        .object(["index": .number(Double(p.index)), "name": .string(p.name), "icon": .string(p.icon)])
     }
 
     static func physicalObject(_ o: PhysicalObject) -> JSON {
@@ -48,7 +49,7 @@ enum MappingProjection {
     }
 
     static func entity(_ e: EntityDescriptor) -> JSON {
-        var o: [String: JSON] = ["id": .string(e.id), "name": .string(e.name)]
+        var o: [String: JSON] = ["id": .string(e.id), "name": .string(e.name), "icon": e.icon.map(JSON.string) ?? .null]
         switch e {
         case .toggle(let d):
             o["kind"] = "switch"

@@ -37,9 +37,11 @@ public struct ButtonBistableComponentDTO: Decodable, Sendable {
     public let actions: [ActionRefDTO]
     public let onIndication: String
     public let offIndication: String
+    /// The icon chosen in Object Manager, such as `bulb` or `power_socket`; Object Manager always writes it.
+    public let image: String?
 
     enum CodingKeys: String, CodingKey {
-        case label, rowId, unit, state, actions, onIndication, offIndication
+        case label, rowId, unit, state, actions, onIndication, offIndication, image
     }
 
     public init(from decoder: Decoder) throws {
@@ -54,6 +56,7 @@ public struct ButtonBistableComponentDTO: Decodable, Sendable {
         actions = try c.decode([ActionRefDTO].self, forKey: .actions)
         onIndication = try c.decode(String.self, forKey: .onIndication)
         offIndication = try c.decode(String.self, forKey: .offIndication)
+        image = try c.decodeIfPresent(String.self, forKey: .image)
     }
 }
 
@@ -65,9 +68,11 @@ public struct ButtonBistableV2ComponentDTO: Decodable, Sendable {
     public let actions: [ActionRefDTO]
     public let onIndication: String
     public let offIndication: String
+    /// The icon chosen in Object Manager, such as `bulb` or `power_socket`; Object Manager always writes it.
+    public let image: String?
 
     enum CodingKeys: String, CodingKey {
-        case label, rowId, unit, state, actions, onIndication, offIndication
+        case label, rowId, unit, state, actions, onIndication, offIndication, image
     }
 
     public init(from decoder: Decoder) throws {
@@ -82,6 +87,7 @@ public struct ButtonBistableV2ComponentDTO: Decodable, Sendable {
         actions = try c.decode([ActionRefDTO].self, forKey: .actions)
         onIndication = try c.decode(String.self, forKey: .onIndication)
         offIndication = try c.decode(String.self, forKey: .offIndication)
+        image = try c.decodeIfPresent(String.self, forKey: .image)
     }
 }
 

@@ -10,7 +10,7 @@ public enum DeviceMapper {
     /// Every device of the interface, one per widget, in page order. Widgets of an unknown type are left out.
     public static func descriptors(for interface: MobileInterfaceDTO) -> [DeviceDescriptor] {
         interface.pages.enumerated().flatMap { index, page -> [DeviceDescriptor] in
-            let devicePage = DevicePage(index: index, name: page.name)
+            let devicePage = DevicePage(index: index, name: page.name, icon: page.icon)
             // The nearest header above, per page (spec §6.1); a header that
             // did not parse is not in `items`, so it starts no section.
             var section: DeviceSection?
@@ -32,6 +32,7 @@ public enum DeviceMapper {
             id: widget.id,
             typeName: widget.typeName,
             kind: kind(of: widget),
+            icon: icon(of: widget),
             page: page,
             section: section,
             name: name(of: widget),
@@ -85,6 +86,24 @@ public enum DeviceMapper {
         }
     }
 
+    /// The widget's icon (spec §6.1): the types with a widget-level `icon`;
+    /// the others carry icons on their components.
+    private static func icon(of widget: WidgetDTO) -> String? {
+        switch widget {
+        case .valueV2(let w): return w.icon
+        case .dimmerV2(let w): return w.icon
+        case .contactSensor(let w): return w.icon
+        case .slider(let w): return w.icon
+        case .multisensor(let w): return w.icon
+        case .rollerShutterV3(let w): return w.icon
+        case .thermostatV2(let w): return w.icon
+        case .eventScheduler(let w): return w.icon
+        case .tvRemoteControl(let w): return w.icon
+        case .valueDouble, .contactSensorDouble, .onOff, .onOffDouble, .rollerShutter, .camera, .scene, .sceneDouble, .led:
+            return nil
+        }
+    }
+
     /// Device name rule of spec §6.1: the widget label when the widget has
     /// one; otherwise its components' non-empty labels joined with " / "
     /// (LED: the BUTTON_BISTABLE label).
@@ -120,7 +139,7 @@ public enum DeviceMapper {
         switch widget {
         case .valueV2(let w):
             return [.sensor(SensorDescriptor(
-                id: "\(w.id)_0", name: w.label,
+                id: "\(w.id)_0", name: w.label, icon: w.icon,
                 state: ValueRef(dto: w.object.value),
                 kind: .generic, grentonUnit: w.unit,
                 valueType: w.valueType, precision: w.precision))]
@@ -129,13 +148,13 @@ public enum DeviceMapper {
             // Suffixes _0/_1 — reference unique_id contract (spec §6.3.5).
             return [
                 .sensor(SensorDescriptor(
-                    id: "\(w.id)_0", name: w.componentLeft.label,
+                    id: "\(w.id)_0", name: w.componentLeft.label, icon: w.componentLeft.icon,
                     state: ValueRef(dto: w.componentLeft.object.value),
                     kind: .generic, grentonUnit: w.componentLeft.unit,
                     valueType: w.componentLeft.valueType,
                     precision: w.componentLeft.precision)),
                 .sensor(SensorDescriptor(
-                    id: "\(w.id)_1", name: w.componentRight.label,
+                    id: "\(w.id)_1", name: w.componentRight.label, icon: w.componentRight.icon,
                     state: ValueRef(dto: w.componentRight.object.value),
                     kind: .generic, grentonUnit: w.componentRight.unit,
                     valueType: w.componentRight.valueType,
@@ -144,7 +163,7 @@ public enum DeviceMapper {
 
         case .onOff(let w):
             return w.components.compactMap { component in
-                toggle(widgetId: w.id, label: component.label, rowId: component.rowId,
+                toggle(widgetId: w.id, label: component.label, rowId: component.rowId, image: component.image,
                        state: component.state, actions: component.actions,
                        onIndication: component.onIndication,
                        offIndication: component.offIndication)
@@ -152,7 +171,7 @@ public enum DeviceMapper {
 
         case .onOffDouble(let w):
             return w.components.compactMap { component in
-                toggle(widgetId: w.id, label: component.label, rowId: component.rowId,
+                toggle(widgetId: w.id, label: component.label, rowId: component.rowId, image: component.image,
                        state: component.state, actions: component.actions,
                        onIndication: component.onIndication,
                        offIndication: component.offIndication)
@@ -164,7 +183,7 @@ public enum DeviceMapper {
                   let setAction = try? ActionRef(dto: w.object.setValueAction)
             else { return [] }
             return [.dimmableLight(DimmableLightDescriptor(
-                id: "\(w.id)_0", name: w.label,
+                id: "\(w.id)_0", name: w.label, icon: w.icon,
                 state: ValueRef(dto: w.object.value),
                 min: w.min, max: w.max, precision: w.precision,
                 onAction: onAction, offAction: offAction, setValueAction: setAction))]
@@ -174,13 +193,13 @@ public enum DeviceMapper {
 
         case .contactSensor(let w):
             var result: [EntityDescriptor] = [.contactSensor(ContactSensorDescriptor(
-                id: "\(w.id)_binary_sensor", name: w.label,
+                id: "\(w.id)_binary_sensor", name: w.label, icon: w.icon,
                 state: ValueRef(dto: w.object.value),
                 reversed: w.reverseState,
                 onIndication: w.onIndication, offIndication: w.offIndication))]
             if let clickDto = w.object.clickAction, let click = try? ActionRef(dto: clickDto) {
                 result.append(.trigger(TriggerDescriptor(
-                    id: "\(w.id)_button", name: w.label, action: click)))
+                    id: "\(w.id)_button", name: w.label, icon: w.icon, action: click)))
             }
             return result
 
@@ -189,7 +208,7 @@ public enum DeviceMapper {
             var result: [EntityDescriptor] = []
             for (component, side) in [(w.componentLeft, "left"), (w.componentRight, "right")] {
                 result.append(.contactSensor(ContactSensorDescriptor(
-                    id: "\(w.id)_binary_sensor_\(side)", name: component.label,
+                    id: "\(w.id)_binary_sensor_\(side)", name: component.label, icon: component.icon,
                     state: ValueRef(dto: component.object.value),
                     reversed: component.reverseState,
                     onIndication: component.onIndication,
@@ -197,7 +216,7 @@ public enum DeviceMapper {
                 if let clickDto = component.object.clickAction,
                    let click = try? ActionRef(dto: clickDto) {
                     result.append(.trigger(TriggerDescriptor(
-                        id: "\(w.id)_button_\(side)", name: component.label, action: click)))
+                        id: "\(w.id)_button_\(side)", name: component.label, icon: component.icon, action: click)))
                 }
             }
             return result
@@ -205,13 +224,13 @@ public enum DeviceMapper {
         case .slider(let w):
             guard let setAction = try? ActionRef(dto: w.object.setValueAction) else { return [] }
             var result: [EntityDescriptor] = [.numberSetting(NumberSettingDescriptor(
-                id: "\(w.id)_slider", name: w.label,
+                id: "\(w.id)_slider", name: w.label, icon: w.icon,
                 state: ValueRef(dto: w.object.value),
                 setValueAction: setAction,
                 min: w.min, max: w.max, precision: w.precision))]
             if let clickDto = w.object.clickAction, let click = try? ActionRef(dto: clickDto) {
                 result.append(.trigger(TriggerDescriptor(
-                    id: "\(w.id)_button", name: w.label, action: click)))
+                    id: "\(w.id)_button", name: w.label, icon: w.icon, action: click)))
             }
             return result
 
@@ -228,7 +247,7 @@ public enum DeviceMapper {
             ]
             return channels.map { suffix, kind, object in
                 .sensor(SensorDescriptor(
-                    id: "\(w.id)_\(suffix)", name: w.label,
+                    id: "\(w.id)_\(suffix)", name: w.label, icon: w.icon,
                     state: ValueRef(dto: object.value),
                     kind: kind, grentonUnit: nil, valueType: nil, precision: nil))
             }
@@ -241,10 +260,10 @@ public enum DeviceMapper {
             else { return [] }
             return [
                 .stateSensor(StateSensorDescriptor(
-                    id: "\(w.id)_sensor", name: component.label,
+                    id: "\(w.id)_sensor", name: component.label, icon: component.image,
                     state: ValueRef(dto: component.state))),
                 .trigger(TriggerDescriptor(
-                    id: "\(w.id)_button", name: component.label, action: action)),
+                    id: "\(w.id)_button", name: component.label, icon: component.image, action: action)),
             ]
 
         case .rollerShutterV3(let w):
@@ -260,7 +279,7 @@ public enum DeviceMapper {
             let stop = w.object.stopAction.flatMap { try? ActionRef(dto: $0) }
             // Id = widget id, NO suffix (reference unique_id contract).
             return [.cover(CoverDescriptor(
-                id: w.id, name: w.label,
+                id: w.id, name: w.label, icon: w.icon,
                 motionState: ValueRef(dto: w.object.state),
                 position: ValueRef(dto: w.object.position),
                 setPositionAction: setPosition,
@@ -270,7 +289,7 @@ public enum DeviceMapper {
             // Completeness (spec §6.3.11 Δ): needs a stream component.
             guard let component = w.components.first else { return [] }
             return [.camera(CameraDescriptor(
-                id: "\(w.id)_0", name: component.label, streamURL: component.value))]
+                id: "\(w.id)_0", name: component.label, icon: component.image, streamURL: component.value))]
 
         case .scene(let w):
             return w.components.compactMap { component in
@@ -291,7 +310,7 @@ public enum DeviceMapper {
                 return ThermostatDescriptor.Control(state: ValueRef(dto: state), setAction: setAction)
             }
             return [.thermostat(ThermostatDescriptor(
-                id: "\(w.id)_0", name: w.label,
+                id: "\(w.id)_0", name: w.label, icon: w.icon,
                 currentTemperature: ValueRef(dto: o.currentTemperature),
                 targetTemperature: ValueRef(dto: o.targetTemperature),
                 setTargetTemperatureAction: setTarget,
@@ -307,7 +326,7 @@ public enum DeviceMapper {
                   let delete = try? ActionRef(dto: o.deleteRuleAction) else { return [] }
             func optional(_ action: ActionRefDTO?) -> ActionRef? { action.flatMap { try? ActionRef(dto: $0) } }
             return [.eventSchedule(EventScheduleDescriptor(
-                id: "\(w.id)_0", name: w.label,
+                id: "\(w.id)_0", name: w.label, icon: w.icon,
                 state: ValueRef(dto: o.state), ruleList: ValueRef(dto: o.ruleList),
                 addRuleAction: add, deleteRuleAction: delete,
                 ruleCount: o.ruleCount.map(ValueRef.init(dto:)), ruleSpace: o.ruleSpace.map(ValueRef.init(dto:)),
@@ -323,7 +342,7 @@ public enum DeviceMapper {
                 guard let button = TvRemoteButton(rawValue: name), let action = try? ActionRef(dto: dto) else { continue }
                 buttons[button] = action
             }
-            return [.tvRemote(TvRemoteDescriptor(id: "\(w.id)_0", name: w.label, vodLabel: w.vodLabel, buttons: buttons))]
+            return [.tvRemote(TvRemoteDescriptor(id: "\(w.id)_0", name: w.label, icon: w.icon, vodLabel: w.vodLabel, buttons: buttons))]
         }
     }
 
@@ -333,13 +352,14 @@ public enum DeviceMapper {
             .compactMap { try? ActionRef(dto: $0) }
             .first { $0.event == .click && $0.call == .script }
         guard let script else { return nil }
-        return .sceneTrigger(SceneTriggerDescriptor(id: id, name: component.label, action: script))
+        // A scene's component has no image (spec §3.5): no icon.
+        return .sceneTrigger(SceneTriggerDescriptor(id: id, name: component.label, icon: nil, action: script))
     }
 
     /// Shared ON_OFF / ON_OFF_DOUBLE component mapping: both the ON and the
     /// OFF action must be present or the component is skipped (spec §6.3.1).
     private static func toggle(
-        widgetId: String, label: String, rowId: Int,
+        widgetId: String, label: String, rowId: Int, image: String?,
         state: ValueRefDTO, actions: [ActionRefDTO],
         onIndication: String, offIndication: String
     ) -> EntityDescriptor? {
@@ -355,7 +375,7 @@ public enum DeviceMapper {
         }
         guard let onAction, let offAction else { return nil }
         return .toggle(ToggleDescriptor(
-            id: "\(widgetId)_\(rowId)", name: label,
+            id: "\(widgetId)_\(rowId)", name: label, icon: image,
             state: ValueRef(dto: state),
             onAction: onAction, offAction: offAction,
             onIndication: onIndication, offIndication: offIndication))
@@ -403,7 +423,7 @@ public enum DeviceMapper {
         else { return nil }
 
         return HsbLightDescriptor(
-            id: "\(widget.id)_0", name: button.label,
+            id: "\(widget.id)_0", name: button.label, icon: button.image,
             powerState: ValueRef(dto: button.state),
             onAction: onAction, offAction: offAction,
             hue: hueChannel, saturation: saturationChannel, brightness: brightnessChannel)

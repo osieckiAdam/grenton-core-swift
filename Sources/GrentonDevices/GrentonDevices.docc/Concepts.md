@@ -29,6 +29,15 @@ sensor with a button is one device with a sensor and a trigger.
 Entity ids are stable: the widget id plus a suffix, such as `k3Xq9TzA_0`.
 Use them to store your own settings per entity.
 
+The protocol has no device class: a relay behind a lamp and one behind a
+pump are the same switch, and nothing on the wire tells them apart. The
+one hint is the **icon** the installer chose in Object Manager, which the
+interface carries for every widget and component: `bulb`, `plafond`,
+`ceiling_lamp_2`, `power_socket`, `floor_heating`, `vacuum_robot_4`… The
+library passes the names on — `BoundEntity/icon`, `DeviceDescriptor/icon`,
+`DevicePage/icon` — and does not interpret them; what counts as a light
+is your call. See <doc:ControllingDevices>.
+
 Every device knows where the myGrenton app shows it: its `page` (index
 and name, often a room) and its `section` — the header above it on that
 page, or `nil` above the first header. Devices come in page order, so a
