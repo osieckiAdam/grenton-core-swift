@@ -124,19 +124,7 @@ enum Operations {
         },
         "schedule.rules": { input in
             guard let rules = ScheduleRule.rules(in: try input.string("text")) else { return ok(["rules": .null]) }
-            func project(_ r: ScheduleRule) -> JSON {
-                var o: [String: JSON] = ["id": .number(Double(r.id)), "isEnabled": .bool(r.isEnabled), "cron": .string(r.cron)]
-                o["hour"] = r.hour.map { JSON.number(Double($0)) } ?? .null
-                o["minute"] = r.minute.map { JSON.number(Double($0)) } ?? .null
-                if let days = r.days {
-                    let numbers: [JSON] = days.map(\.rawValue).sorted().map { JSON.number(Double($0)) }
-                    o["days"] = .array(numbers)
-                } else {
-                    o["days"] = .null
-                }
-                return .object(o)
-            }
-            return ok(["rules": .array(rules.map(project))])
+            return ok(["rules": .array(rules.map(rule))])
         },
         "schedule.cron": { input in
             guard let hour = input["hour"]?.intValue, let minute = input["minute"]?.intValue,
@@ -150,6 +138,7 @@ enum Operations {
             guard let text = ScheduleRule.cron(hour: hour, minute: minute, days: days) else { return reject }
             return ok(["text": .string(text)])
         },
+        "provisioning.archive": { input in try ProvisioningOperations.archive(input) },
         "number.format": { input in
             guard case .double(let value) = try untagged(input["value"]),
                   let precision = input["precision"]?.intValue else {
@@ -169,6 +158,20 @@ enum Operations {
             guard let steps = testCase.input["steps"]?.arrayValue else { throw SuiteError("session.scenario: no steps") }
             let observed = try await SessionScenario(input: testCase.input).run(steps)
             return .object(["outcome": .string("ok"), "value": observed])
+        }
+        do {
+            switch testCase.operation {
+            case "provisioning.fetch":
+                return try await ProvisioningOperations.fetch(testCase.input)
+            case "entity.read", "entity.intent":
+                return try await EntityOperations.run(testCase.operation, testCase.input)
+            default:
+                break
+            }
+        } catch let error as SuiteError {
+            throw error
+        } catch {
+            return .object(["outcome": .string("error"), "code": .string(errorCode(error))])
         }
         guard let handler = registry[testCase.operation] else {
             throw SuiteError("no handler for operation \(testCase.operation)")
@@ -212,6 +215,20 @@ enum Operations {
     }
 
     // MARK: - Projection helpers
+
+    /// A schedule rule as `schedule.rules` projects it.
+    static func rule(_ r: ScheduleRule) -> JSON {
+        var o: [String: JSON] = ["id": .number(Double(r.id)), "isEnabled": .bool(r.isEnabled), "cron": .string(r.cron)]
+        o["hour"] = r.hour.map { JSON.number(Double($0)) } ?? .null
+        o["minute"] = r.minute.map { JSON.number(Double($0)) } ?? .null
+        if let days = r.days {
+            let numbers: [JSON] = days.map(\.rawValue).sorted().map { JSON.number(Double($0)) }
+            o["days"] = .array(numbers)
+        } else {
+            o["days"] = .null
+        }
+        return .object(o)
+    }
 
     static let reject = JSON.object(["outcome": .string("reject")])
 

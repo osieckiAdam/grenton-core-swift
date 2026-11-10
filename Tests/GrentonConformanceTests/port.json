@@ -1,5 +1,5 @@
 {
-  "suiteVersion": "0.14.0",
-  "profiles": ["stateless", "mapping", "session", "project"],
+  "suiteVersion": "0.15.0",
+  "profiles": ["stateless", "mapping", "session", "project", "provisioning", "entities"],
   "skips": []
 }

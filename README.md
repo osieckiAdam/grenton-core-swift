@@ -226,10 +226,14 @@ swift test
 [conformance suite](https://github.com/osieckiAdam/grenton-core-spec/blob/main/spec/conformance.md). It fails if the
 submodule is missing, if the manifest is inconsistent, or if a case fails.
 [`Tests/GrentonConformanceTests/port.json`](Tests/GrentonConformanceTests/port.json)
-declares the suite version, the profiles this port claims (currently
-`stateless`, `mapping` and `session`) and any skipped cases (none today).
-The `session` scenarios drive a real `CluSession` through a scripted
-transport and a virtual clock, so they need no network and no CLU.
+declares the suite version, the profiles this port claims (currently all
+six: `stateless`, `mapping`, `session`, `project`, `provisioning` and
+`entities`) and any skipped cases (none today). The `session` scenarios
+drive a real `CluSession` through a scripted transport and a virtual clock,
+so they need no network and no CLU. The `provisioning.fetch` cases start an
+HTTP server on 127.0.0.1 for the real `ProvisioningClient`, and the
+`entities` cases bind the real entities to a state store and a command
+recorder.
 
 To move to a newer suite, update the submodule and bump `suiteVersion` in
 `port.json`:

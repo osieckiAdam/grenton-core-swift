@@ -3,6 +3,20 @@
 Versions follow the specification the port implements; see README,
 "Versioning and stability".
 
+## Unreleased
+
+- Follows spec 0.15.0 (suite 0.15.0, 383 cases, two new profiles). The
+  spec now states rules this port already followed — redirects not
+  followed, no PIN in error text, the 10 MiB limit counted while inflating
+  with sizes and CRC checked, clamped reads, integer reads that turn an
+  out-of-range double into `nil`, one unconnected socket for the
+  any-source transport — so the library is unchanged. The conformance
+  runner claims `provisioning` (archives through
+  `ProvisioningClient.parseInterfaceArchive`, downloads from an HTTP server
+  on loopback, counting requests and searching every error text for the
+  PIN) and `entities` (the real binder over a `StateStore` and a command
+  recorder: every state read and the actions every intent sends).
+
 ## 0.14.0 — 2026-10-26
 
 - Follows spec 0.14.0 (suite 0.14.0): icons travel with the devices.
