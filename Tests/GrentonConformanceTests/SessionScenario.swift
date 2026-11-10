@@ -179,6 +179,8 @@ final class SessionScenario: @unchecked Sendable {
         } else if let label = step["fail"]?.stringValue {
             try labeled(label).fail()
             await settle()
+        } else if let label = step["failSend"]?.stringValue {
+            try labeled(label).failNextSend()
         } else {
             throw SuiteError("unknown step \(step)")
         }

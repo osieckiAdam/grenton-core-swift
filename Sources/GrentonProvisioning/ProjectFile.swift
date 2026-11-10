@@ -40,7 +40,7 @@ public struct ProjectFile: Sendable {
 
     /// Reads and validates the project file.
     ///
-    /// - Throws: ``ProvisioningError/invalidData(_:)`` when the file is not a project archive, an XML document is malformed, or an interface entry is not valid JSON.
+    /// - Throws: ``ProvisioningError/invalidData(_:)`` when the file is not a project archive, an XML document is malformed or not UTF-8, or an interface entry is not valid JSON.
     public init(data: Data) throws {
         let archive = try ProjectArchive(data: data)
         properties = try XmlDocument.parse(try archive.required("properties.xml"))

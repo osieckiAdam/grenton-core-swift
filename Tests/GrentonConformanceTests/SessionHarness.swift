@@ -80,6 +80,7 @@ final class ScriptedSocket: UdpSocket, @unchecked Sendable {
     private let transport: ScriptedTransport
     private let lock = NSLock()
     private var closed = false
+    private var rejectNextSend = false
 
     init(serial: Int, transport: ScriptedTransport) {
         var continuation: AsyncStream<Data>.Continuation!
@@ -96,8 +97,20 @@ final class ScriptedSocket: UdpSocket, @unchecked Sendable {
     }
 
     func send(_ datagram: Data) async throws {
-        guard !isClosed else { throw TransportError.connectionFailed("closed") }
+        let failure: String? = lock.withLock {
+            if closed { return "closed" }
+            guard rejectNextSend else { return nil }
+            rejectNextSend = false
+            return "send rejected"
+        }
+        if let failure { throw TransportError.connectionFailed(failure) }
         transport.record(datagram, from: self)
+    }
+
+    /// The next send is rejected at once with an error and recorded
+    /// nowhere; one send only (conformance.md §4b `failSend`).
+    func failNextSend() {
+        lock.withLock { rejectNextSend = true }
     }
 
     func deliver(_ datagram: Data) {

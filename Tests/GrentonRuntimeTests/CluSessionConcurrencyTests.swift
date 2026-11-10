@@ -68,6 +68,26 @@ import GrentonTestSupport
         await session.stop()
     }
 
+    @Test func stopReleasesPingsWaitingOnASharedAttempt() async throws {
+        // A ping that joined one on the wire ends with stop(), not at the
+        // timeout; a later start() pings on its own (spec §5.4.5).
+        let (fake, session) = try makeFixture(timeout: .seconds(10))
+        await session.start()
+        await fake.setSilenced { $0 == "checkAlive()" }
+        async let owner = session.ping()
+        try await Task.sleep(for: .milliseconds(50))
+        async let joined = session.ping()
+        try await Task.sleep(for: .milliseconds(50))
+        let clock = ContinuousClock()
+        let elapsed = await clock.measure { await session.stop() }
+        #expect(await (owner, joined) == (false, false))
+        #expect(elapsed < .seconds(2))
+        await fake.setSilenced { _ in false }
+        await session.start()
+        #expect(await session.state == .ready)
+        await session.stop()
+    }
+
     @Test func cancelledGateWaiterNeverRunsItsOperation() async throws {
         let (fake, session) = try makeFixture(timeout: .milliseconds(300))
         await session.start()
