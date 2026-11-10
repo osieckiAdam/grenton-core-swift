@@ -3,7 +3,7 @@
 Versions follow the specification the port implements; see README,
 "Versioning and stability".
 
-## Unreleased
+## 0.15.0 — 2026-11-10
 
 - Follows spec 0.15.0 (suite 0.15.0, 383 cases, two new profiles). The
   spec now states rules this port already followed — redirects not
