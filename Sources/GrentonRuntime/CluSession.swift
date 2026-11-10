@@ -317,6 +317,9 @@ public actor CluSession {
         lastReplyAt = nil
         lastReportAt = nil
         lastPingRoundTrip = nil
+        // Whoever joined a ping in progress fails now; a start() after this
+        // stop() begins an attempt of its own.
+        if let attempt = pingAttempt { finishPingAttempt(attempt, result: false) }
         pingLoopTask?.cancel()
         pingLoopTask = nil
         registerLoopTask?.cancel()
@@ -367,18 +370,50 @@ public actor CluSession {
 
     // MARK: - Ping (spec §5.3.1, §5.4.4)
 
+    /// Checks that the CLU answers; `true` on an answer within the response
+    /// timeout. Called while another ping is on the wire, it sends nothing
+    /// and returns that ping's result. `false` before `start()` and after
+    /// `stop()`.
     @discardableResult
     public func ping() async -> Bool {
         await pingInternal(gateHeld: false)
+    }
+
+    /// The callers waiting on the ping attempt in progress.
+    private final class PingAttempt {
+        var waiters: [CheckedContinuation<Bool, Never>] = []
+    }
+
+    /// The ping attempt in progress (from the loop, a caller or start());
+    /// a ping called meanwhile joins it instead of sending (spec §5.4.5).
+    private var pingAttempt: PingAttempt?
+
+    /// Ends the attempt for everyone who joined it; `stop()` ends it early
+    /// with failure, so its owner then resumes nobody.
+    private func finishPingAttempt(_ attempt: PingAttempt, result: Bool) {
+        if pingAttempt === attempt { pingAttempt = nil }
+        let waiters = attempt.waiters
+        attempt.waiters = []
+        for waiter in waiters { waiter.resume(returning: result) }
     }
 
     private func pingInternal(gateHeld: Bool) async -> Bool {
         // Only start() opens a session (spec §5.4.5).
         guard state != .stopped, state != .idle else { return false }
 
-        // A ping is already in flight (they all share keepAliveId) — don't
-        // race it and don't disturb the state it will set.
-        guard pending[keepAliveId] == nil else { return false }
+        // Concurrent pings share one attempt: send nothing, return its
+        // result. Its timeout counts once in the streak (spec §5.4.5).
+        if let attempt = pingAttempt {
+            return await withCheckedContinuation { attempt.waiters.append($0) }
+        }
+        let attempt = PingAttempt()
+        pingAttempt = attempt
+        let result = await attemptPing(gateHeld: gateHeld)
+        finishPingAttempt(attempt, result: result)
+        return result
+    }
+
+    private func attemptPing(gateHeld: Bool) async -> Bool {
 
         if mainSocket == nil {
             // Degraded retry reopens the main socket first (spec §5.4.5).
@@ -388,8 +423,7 @@ public actor CluSession {
             if state != .stopped { state = .degraded; needsRecovery = needsRecovery || !desiredKeys.isEmpty }
             return false
         }
-        // Recheck after the open await: a concurrent ping may have won the
-        // race and already put its request in flight.
+        // Pings share one attempt, so none is in flight here.
         guard pending[keepAliveId] == nil else { return false }
         // A reply or failure on a socket that was replaced meanwhile (number
         // rollover, failure, stop) says nothing about the current one.
@@ -420,8 +454,7 @@ public actor CluSession {
             if case SessionError.timeout = error {
                 consecutivePingTimeouts += 1
                 if consecutivePingTimeouts >= Self.pingTimeoutsBeforeReplacing {
-                    logger.warning("[\(clu.name)] \(consecutivePingTimeouts) pings unanswered; replacing the main socket")
-                    abandonMainSocket()
+                    abandonMainSocket(reason: "\(consecutivePingTimeouts) pings unanswered; replacing the main socket")
                 }
             }
             return false
@@ -711,9 +744,11 @@ public actor CluSession {
     /// treat it as a failed socket (spec §5.4.1 pt 4). Closing it ends the
     /// stuck sends; the ping loop opens a new one and recovery registers
     /// again, from a new port, so the old subscriptions just expire.
-    private func abandonMainSocket() {
+    private func abandonMainSocket(
+        reason: String = "A send did not finish in time; replacing the main socket"
+    ) {
         guard let socket = mainSocket else { return }
-        logger.warning("[\(clu.name)] A send did not finish in time; replacing the main socket")
+        logger.warning("[\(clu.name)] \(reason)")
         failAllPending(SessionError.connectionClosed)
         socket.close()
         mainSocket = nil
@@ -761,6 +796,7 @@ public actor CluSession {
                 msgId: random.messageId(), payload: Payloads.clientDestroy(sessionId: $0)))
         }
         let token = UUID()
+        let generation = mainSocketGeneration
         inflightSends[token] = Task {
             defer { self.inflightSends[token] = nil }
             for (number, frame) in frames {
@@ -769,6 +805,12 @@ public actor CluSession {
                     logger.debug("[\(clu.name)] Sent: \(frame)")
                 } catch {
                     logger.debug("[\(clu.name)] clientDestroy \(number) not sent: \(error)")
+                    // A rejected send fails the socket (spec §5.4.1 pt 4);
+                    // during stop() it closes anyway.
+                    if self.state != .stopped, generation == self.mainSocketGeneration, self.mainSocket != nil {
+                        self.abandonMainSocket(reason: "The transport rejected a send (\(error)); replacing the main socket")
+                        return
+                    }
                 }
             }
         }
@@ -846,6 +888,7 @@ public actor CluSession {
         logger.debug("[\(clu.name)][\(id)] Sent: \(frame)")
 
         let token = UUID()
+        let generation = mainSocketGeneration
         let timeoutTask = Task { [clock, responseTimeout] in
             try? await sleepOn(clock, for: responseTimeout)
             guard !Task.isCancelled else { return }
@@ -869,13 +912,27 @@ public actor CluSession {
                     do {
                         try await socket.send(datagram)
                     } catch {
-                        self.failPending(id, token: token, error: error)
+                        self.sendRejected(id, token: token, generation: generation, error: error)
                     }
                 }
             }
         } onCancel: {
             Task { await self.failPending(id, token: token, error: CancellationError()) }
         }
+    }
+
+    /// The transport rejected a send at once: that is a failure of the
+    /// socket, not of the one request (spec §5.4.1 pt 4). Such a socket
+    /// rejects every later send too, and since nothing goes out no ping
+    /// ever times out, so only closing it lets the next ping open a new
+    /// one. Every pending request on it, this one included, ends with
+    /// `connectionClosed`.
+    private func sendRejected(_ id: String, token: UUID, generation: Int, error: any Error) {
+        if generation == mainSocketGeneration, mainSocket != nil, state != .stopped {
+            abandonMainSocket(reason: "The transport rejected a send (\(error)); replacing the main socket")
+        }
+        // The socket was already replaced or stopped: end this request alone.
+        failPending(id, token: token, error: SessionError.connectionClosed)
     }
 
     /// Ends the request `id` only while it is still the one `token` names.

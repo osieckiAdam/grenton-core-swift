@@ -5,7 +5,7 @@ Versions follow the specification the port implements; see README,
 
 ## 0.15.0 — 2026-11-10
 
-- Follows spec 0.15.0 (suite 0.15.0, 383 cases, two new profiles). The
+- Follows spec 0.15.0 (suite 0.15.0, 391 cases, two new profiles). The
   spec now states rules this port already followed — redirects not
   followed, no PIN in error text, the 10 MiB limit counted while inflating
   with sizes and CRC checked, clamped reads, integer reads that turn an
@@ -16,6 +16,20 @@ Versions follow the specification the port implements; see README,
   on loopback, counting requests and searching every error text for the
   PIN) and `entities` (the real binder over a `StateStore` and a command
   recorder: every state read and the actions every intent sends).
+- A send the transport rejects at once (for example after a network
+  change took the local address away) now fails the main socket instead
+  of the one request: the socket closes, every request waiting on it ends
+  with `SessionError.connectionClosed`, the session is `degraded`, and the
+  next ping opens a new socket and registers again. Before, such a socket
+  was never replaced, because nothing went out and no ping timed out.
+- `CluSession.ping()` called while another ping is on the wire waits for
+  it and returns its result instead of `false`; a shared timeout counts
+  once towards the three that replace the socket.
+- The project import accepts UTF-8 XML only, with or without a byte-order
+  mark: a UTF-16 document or one declaring another encoding is
+  `invalidData`, as the spec now requires.
+- The conformance runner implements the `failSend` step (suite 0.15.0,
+  391 cases).
 
 ## 0.14.0 — 2026-10-26
 

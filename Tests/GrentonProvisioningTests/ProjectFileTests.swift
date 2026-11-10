@@ -42,16 +42,29 @@ import Testing
 }
 
 @Suite struct ProjectXmlTests {
-    @Test func doctypeIsFoundInEveryEncoding() {
+    @Test func doctypeIsFoundInTheProlog() {
         let doc = "<?xml version=\"1.0\"?>\n<!-- c --> <!DOCTYPE x [<!ENTITY e \"1\">]><x/>"
-        #expect(XmlDocument.hasDoctype(Data(doc.utf8)) == true)
-        #expect(XmlDocument.hasDoctype(Data([0xFF, 0xFE]) + doc.data(using: .utf16LittleEndian)!) == true)
-        #expect(XmlDocument.hasDoctype(doc.data(using: .utf16BigEndian)!) == true)
-        #expect(XmlDocument.hasDoctype(Data("<?xml version=\"1.0\"?><x><!-- <!DOCTYPE --></x>".utf8)) == false)
-        // An undecodable document is rejected, not passed on to the parser.
-        #expect(XmlDocument.hasDoctype(Data([0x3C, 0x78, 0xFF, 0x3E])) == nil)
-        #expect(throws: ProvisioningError.self) { try XmlDocument.parse(Data([0x3C, 0x78, 0xFF, 0x3E])) }
+        #expect(XmlDocument.hasDoctype(doc) == true)
+        #expect(XmlDocument.hasDoctype("<?xml version=\"1.0\"?><x><!-- <!DOCTYPE --></x>") == false)
         #expect(throws: ProvisioningError.self) { try XmlDocument.parse(Data(doc.utf8)) }
+        #expect(throws: ProvisioningError.self) { try XmlDocument.parse(Data([0xEF, 0xBB, 0xBF]) + Data(doc.utf8)) }
+    }
+
+    @Test func onlyUtf8IsAccepted() {
+        let doc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><x/>"
+        #expect(XmlDocument.utf8Text(Data(doc.utf8)) == doc)
+        #expect(XmlDocument.utf8Text(Data([0xEF, 0xBB, 0xBF]) + Data(doc.utf8)) == doc)
+        #expect(XmlDocument.utf8Text(Data("<?xml version='1.0' encoding='utf-8'?><x/>".utf8)) != nil)
+        #expect(XmlDocument.utf8Text(Data("<x/>".utf8)) == "<x/>")
+        // Another declared encoding, even with ASCII bytes.
+        #expect(XmlDocument.utf8Text(Data("<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><x/>".utf8)) == nil)
+        // UTF-16 with and without a byte-order mark.
+        #expect(XmlDocument.utf8Text(Data([0xFF, 0xFE]) + doc.data(using: .utf16LittleEndian)!) == nil)
+        #expect(XmlDocument.utf8Text(doc.data(using: .utf16BigEndian)!) == nil)
+        #expect(XmlDocument.utf8Text(doc.data(using: .utf16LittleEndian)!) == nil)
+        // Invalid UTF-8.
+        #expect(XmlDocument.utf8Text(Data([0x3C, 0x78, 0xFF, 0x3E])) == nil)
+        #expect(throws: ProvisioningError.self) { try XmlDocument.parse(Data([0x3C, 0x78, 0xFF, 0x3E])) }
     }
 
     @Test func resolvesReferencesAndTrimsText() throws {

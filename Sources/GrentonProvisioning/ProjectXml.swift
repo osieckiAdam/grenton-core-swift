@@ -1,7 +1,7 @@
 import Foundation
 
-// The XML side of the project import (spec §4.5.1 pt 4, 6, 7): a document
-// without a DTD, parsed into a flat arena of nodes in document order, with
+// The XML side of the project import (spec §4.5.1 pt 4, 6, 7): a UTF-8
+// document without a DTD, parsed into a flat arena of nodes in document order, with
 // Object Manager's `reference="…"` → `id="…"` links resolved on demand.
 struct XmlNode: Sendable {
     let name: String
@@ -17,11 +17,11 @@ struct XmlDocument: Sendable {
     let root: Int
     private let byId: [String: Int]
 
-    /// Parses `data`, rejecting a document with a `<!DOCTYPE>`, a syntax
-    /// error, or two elements sharing an `id`.
+    /// Parses `data`, rejecting a document that is not UTF-8, one with a
+    /// `<!DOCTYPE>`, a syntax error, or two elements sharing an `id`.
     static func parse(_ data: Data) throws -> XmlDocument {
-        guard let doctype = hasDoctype(data) else { throw ProvisioningError.invalidData("XML in an undecodable encoding") }
-        guard !doctype else { throw ProvisioningError.invalidData("XML with a DOCTYPE") }
+        guard let text = utf8Text(data) else { throw ProvisioningError.invalidData("XML that is not UTF-8") }
+        guard !hasDoctype(text) else { throw ProvisioningError.invalidData("XML with a DOCTYPE") }
         let builder = ArenaBuilder()
         let parser = XMLParser(data: data)
         parser.shouldProcessNamespaces = false
@@ -97,18 +97,34 @@ struct XmlDocument: Sendable {
             || (UInt8(ascii: "A")...UInt8(ascii: "F")).contains(byte)
     }
 
-    // MARK: DOCTYPE
+    // MARK: Encoding and DOCTYPE
 
-    /// Whether the prolog holds a document type declaration; nil when the
-    /// document cannot be decoded at all (the caller rejects it). The text
-    /// is decoded the way an XML parser chooses its encoding — byte-order
-    /// mark, the first bytes of the declaration, then its `encoding`
-    /// attribute — so a UTF-16 document is read as such and not searched
-    /// for ASCII bytes.
-    static func hasDoctype(_ data: Data) -> Bool? {
-        guard let text = decodeForProlog(data) else { return nil }
+    /// The document as UTF-8 text without its byte-order mark, or nil when
+    /// it is not a UTF-8 document (spec §4.5.1 pt 4): a UTF-16 or UTF-32
+    /// signature, invalid UTF-8, or an `encoding` declaration naming
+    /// anything but UTF-8 (in any letter case). Object Manager writes UTF-8,
+    /// so a document the parser could read in another encoding is still
+    /// rejected.
+    static func utf8Text(_ data: Data) -> String? {
+        let body = data.starts(with: [0xEF, 0xBB, 0xBF]) ? data.dropFirst(3) : data[...]
+        // A UTF-16/32 byte-order mark is invalid UTF-8; without one, such a
+        // document has a NUL among its first two bytes, which XML forbids.
+        guard !body.prefix(2).contains(0) else { return nil }
+        guard let text = String(data: Data(body), encoding: .utf8) else { return nil }
+        if text.hasPrefix("<?xml"), let end = text.range(of: "?>"),
+           let match = text[..<end.lowerBound].range(
+               of: #"encoding\s*=\s*["'][^"']*["']"#, options: .regularExpression) {
+            let name = text[match].split(separator: "=", maxSplits: 1)[1]
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\"' \t\r\n"))
+            guard name.lowercased() == "utf-8" else { return nil }
+        }
+        return text
+    }
+
+    /// Whether the prolog of the UTF-8 `text` holds a document type
+    /// declaration. The parser's DTD callbacks back this up.
+    static func hasDoctype(_ text: String) -> Bool {
         var rest = Substring(text)
-        if rest.first == "\u{FEFF}" { rest = rest.dropFirst() }
         while true {
             rest = rest.drop(while: \.isWhitespace)
             if rest.hasPrefix("<?") {
@@ -121,38 +137,6 @@ struct XmlDocument: Sendable {
                 return rest.hasPrefix("<!DOCTYPE")
             }
         }
-    }
-
-    private static func decodeForProlog(_ data: Data) -> String? {
-        let head = [UInt8](data.prefix(4))
-        func decode(_ encoding: String.Encoding, dropping bom: Int = 0) -> String? {
-            String(data: data.dropFirst(bom), encoding: encoding)
-        }
-        switch head {
-        case let h where h.starts(with: [0xEF, 0xBB, 0xBF]): return decode(.utf8, dropping: 3)
-        case let h where h.starts(with: [0xFF, 0xFE, 0x00, 0x00]): return decode(.utf32LittleEndian, dropping: 4)
-        case let h where h.starts(with: [0x00, 0x00, 0xFE, 0xFF]): return decode(.utf32BigEndian, dropping: 4)
-        case let h where h.starts(with: [0xFF, 0xFE]): return decode(.utf16LittleEndian, dropping: 2)
-        case let h where h.starts(with: [0xFE, 0xFF]): return decode(.utf16BigEndian, dropping: 2)
-        case let h where h.starts(with: [0x3C, 0x00, 0x3F, 0x00]): return decode(.utf16LittleEndian)
-        case let h where h.starts(with: [0x00, 0x3C, 0x00, 0x3F]): return decode(.utf16BigEndian)
-        case let h where h.starts(with: [0x3C, 0x00, 0x00, 0x00]): return decode(.utf32LittleEndian)
-        case let h where h.starts(with: [0x00, 0x00, 0x00, 0x3C]): return decode(.utf32BigEndian)
-        default: break
-        }
-        // An ASCII-compatible document: honour `encoding="…"` of the declaration.
-        if let declaration = String(data: data.prefix(256), encoding: .isoLatin1),
-           declaration.hasPrefix("<?xml"),
-           let end = declaration.range(of: "?>"),
-           let match = declaration[..<end.lowerBound].range(of: #"encoding\s*=\s*["']([^"']+)["']"#, options: .regularExpression) {
-            let name = declaration[match].split(separator: "=")[1].trimmingCharacters(in: CharacterSet(charactersIn: "\"' "))
-            let cfEncoding = CFStringConvertIANACharSetNameToEncoding(name as CFString)
-            if cfEncoding != kCFStringEncodingInvalidId {
-                let encoding = String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(cfEncoding))
-                return decode(encoding)
-            }
-        }
-        return decode(.utf8)
     }
 
     // MARK: Arena builder
